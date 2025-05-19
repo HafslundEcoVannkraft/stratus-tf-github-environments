@@ -1,0 +1,195 @@
+name: Vend ACA GitHub Environments
+
+on:
+  workflow_dispatch:
+    inputs:
+      tfvars_path:
+        description: 'Path to tfvars file (required)'
+        required: true
+        type: string
+      github_token:
+        description: 'GitHub token with repo, workflow and read:org permissions (required)'
+        required: true
+        type: string
+      github_owner:
+        description: 'GitHub organization or user name (optional, defaults to HafslundEcoVannkraft)'
+        required: false
+        type: string
+        default: 'HafslundEcoVannkraft'
+      repositories_file:
+        description: 'Path to YAML config file (optional, defaults to stratus-aca-github-environments-{environment}.yaml or stratus-aca-github-environments.yaml if environment-specific file not found)'
+        required: false
+        type: string
+        default: ''
+      is_stratus_tf_examples:
+        description: 'Set to true if calling from stratus-tf-examples repo (optional, defaults to false)'
+        required: false
+        type: boolean
+        default: false
+      operation:
+        description: 'Operation to perform (apply or destroy)'
+        required: true
+        type: choice
+        options:
+          - apply
+          - destroy
+        default: 'apply'
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  DEPLOYMENT_DIR: .deployment-temp
+
+jobs:
+  deploy:
+    name: Deploy GitHub Environments
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+      
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Load tfvars file
+        id: tfvars
+        run: |
+          # Load variables from tfvars file
+          TFVARS_PATH="${{ github.event.inputs.tfvars_path }}"
+          
+          echo "Loading tfvars from $TFVARS_PATH"
+          if [ ! -f "$TFVARS_PATH" ]; then
+            echo "Error: tfvars file not found at $TFVARS_PATH"
+            exit 1
+          fi
+          
+          # Extract required variables
+          SUBSCRIPTION_ID=$(grep 'subscription_id' "$TFVARS_PATH" | cut -d '=' -f2 | tr -d ' "')
+          LOCATION=$(grep 'location' "$TFVARS_PATH" | cut -d '=' -f2 | tr -d ' "')
+          CODE_NAME=$(grep 'code_name' "$TFVARS_PATH" | cut -d '=' -f2 | tr -d ' "')
+          ENVIRONMENT=$(grep 'environment' "$TFVARS_PATH" | cut -d '=' -f2 | tr -d ' "')
+          STATE_STORAGE_ACCOUNT=$(grep 'state_storage_account_name' "$TFVARS_PATH" | cut -d '=' -f2 | tr -d ' "')
+          
+          # Validate required variables
+          if [ -z "$SUBSCRIPTION_ID" ] || [ -z "$LOCATION" ] || [ -z "$CODE_NAME" ] || [ -z "$ENVIRONMENT" ] || [ -z "$STATE_STORAGE_ACCOUNT" ]; then
+            echo "Error: Missing required variables in tfvars file"
+            exit 1
+          fi
+          
+          # Set outputs
+          echo "subscription_id=$SUBSCRIPTION_ID" >> $GITHUB_OUTPUT
+          echo "location=$LOCATION" >> $GITHUB_OUTPUT
+          echo "code_name=$CODE_NAME" >> $GITHUB_OUTPUT
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+          echo "state_storage_account=$STATE_STORAGE_ACCOUNT" >> $GITHUB_OUTPUT
+
+      - name: Set up temporary deployment directory
+        run: |
+          # Create temporary deployment directory
+          mkdir -p ${{ env.DEPLOYMENT_DIR }}
+          
+          # Download template files from the GitHub repository
+          curl -s https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/workflow-templates/main.tf -o ${{ env.DEPLOYMENT_DIR }}/main.tf
+          curl -s https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/workflow-templates/variables.tf -o ${{ env.DEPLOYMENT_DIR }}/variables.tf
+          
+          # Create tfvars file for the deployment
+          cat > ${{ env.DEPLOYMENT_DIR }}/deployment.auto.tfvars << EOF
+          subscription_id            = "${{ steps.tfvars.outputs.subscription_id }}"
+          location                   = "${{ steps.tfvars.outputs.location }}"
+          code_name                  = "${{ steps.tfvars.outputs.code_name }}"
+          environment                = "${{ steps.tfvars.outputs.environment }}"
+          state_storage_account_name = "${{ steps.tfvars.outputs.state_storage_account }}"
+          github_token               = "${{ github.event.inputs.github_token }}"
+          github_owner               = "${{ github.event.inputs.github_owner }}"
+          is_stratus_tf_examples     = ${{ github.event.inputs.is_stratus_tf_examples }}
+          EOF
+          
+          # Note: repositories_file will be added later once we determine which file to use
+          
+          # Download and process backend configuration template
+          curl -s https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/workflow-templates/backend.conf.tmpl | \
+            sed "s/{{CODE_NAME}}/${{ steps.tfvars.outputs.code_name }}/g" | \
+            sed "s/{{ENVIRONMENT}}/${{ steps.tfvars.outputs.environment }}/g" | \
+            sed "s/{{STATE_STORAGE_ACCOUNT}}/${{ steps.tfvars.outputs.state_storage_account }}/g" \
+            > ${{ env.DEPLOYMENT_DIR }}/backend.conf
+          
+          # Determine the repositories file to use
+          REPO_FILE=""
+          
+          # If explicitly specified, try that first
+          if [ -n "${{ github.event.inputs.repositories_file }}" ]; then
+            if [ -f "${{ github.event.inputs.repositories_file }}" ]; then
+              REPO_FILE="${{ github.event.inputs.repositories_file }}"
+              echo "Using specified repositories file: $REPO_FILE"
+            else
+              echo "Error: Specified repositories file ${{ github.event.inputs.repositories_file }} not found."
+              exit 1
+            fi
+          else
+            # Try environment-specific file first
+            ENV_SPECIFIC_FILE="stratus-aca-github-environments-${{ steps.tfvars.outputs.environment }}.yaml"
+            DEFAULT_FILE="stratus-aca-github-environments.yaml"
+            
+            if [ -f "$ENV_SPECIFIC_FILE" ]; then
+              REPO_FILE="$ENV_SPECIFIC_FILE"
+              echo "Using environment-specific repositories file: $REPO_FILE"
+            elif [ -f "$DEFAULT_FILE" ]; then
+              REPO_FILE="$DEFAULT_FILE"
+              echo "Using default repositories file: $REPO_FILE"
+            else
+              echo "Error: No repositories file found. Please create either:"
+              echo "- $ENV_SPECIFIC_FILE (recommended for environment-specific configurations)"
+              echo "- $DEFAULT_FILE (for shared configurations)"
+              echo "Or specify an explicit path using the repositories_file input."
+              exit 1
+            fi
+          fi
+          
+          # Copy the repository environment configuration file to deployment directory
+          cp "$REPO_FILE" ${{ env.DEPLOYMENT_DIR }}/
+          
+          # Update the repositories_file variable in the tfvars to point to the correct file in the deployment directory
+          echo "repositories_file         = \"$(basename $REPO_FILE)\"" >> ${{ env.DEPLOYMENT_DIR }}/deployment.auto.tfvars
+          
+          ls -la ${{ env.DEPLOYMENT_DIR }}/
+
+      - name: Terraform Init
+        working-directory: ${{ env.DEPLOYMENT_DIR }}
+        run: terraform init -backend-config=backend.conf
+      
+      - name: Terraform Validate
+        working-directory: ${{ env.DEPLOYMENT_DIR }}
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: ${{ env.DEPLOYMENT_DIR }}
+        run: terraform plan -out=tfplan
+      
+      - name: Terraform Apply
+        if: github.event.inputs.operation == 'apply'
+        working-directory: ${{ env.DEPLOYMENT_DIR }}
+        run: terraform apply -auto-approve tfplan
+      
+      - name: Terraform Destroy
+        if: github.event.inputs.operation == 'destroy'
+        working-directory: ${{ env.DEPLOYMENT_DIR }}
+        run: terraform destroy -auto-approve
+
+      - name: Clean up temp directory
+        if: always()
+        run: |
+          if [ -d "${{ env.DEPLOYMENT_DIR }}" ]; then
+            rm -rf ${{ env.DEPLOYMENT_DIR }}
+          fi 

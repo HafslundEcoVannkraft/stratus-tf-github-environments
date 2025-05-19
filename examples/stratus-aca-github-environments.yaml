@@ -1,0 +1,50 @@
+# This file is used to configure the repositories that will be enabled for deployment to Azure Container Apps
+repositories:
+  - repo: stratus-tf-examples
+    environments:
+      # Development: Minimal restrictions, optional approvals, no tag restrictions
+      - name: dev
+        wait_timer: 0
+        prevent_self_review: false
+        reviewers:
+          users: []
+          teams: []
+        # No branch policy means minimal restrictions
+        deployment_tag_policy:
+          enabled: false
+          tag_patterns: []
+
+      # Staging: Short wait, required approvals, protected branches, no tag restrictions
+      - name: staging
+        wait_timer: 10
+        prevent_self_review: true
+        reviewers:
+          users:
+            - username: "heintonny"
+          teams:
+            - name: "stratus-az-platform-approvers"
+        deployment_branch_policy:
+          protected_branches: true
+          custom_branch_policies: false
+        deployment_tag_policy:
+          enabled: false
+          tag_patterns: []
+
+      # Production: Longer wait, required approvals, protected branches, tag restrictions
+      - name: prod
+        wait_timer: 30
+        prevent_self_review: true
+        reviewers:
+          users:
+            - username: "heintonny"
+          teams:
+            - name: "stratus-az-platform-approvers"
+        deployment_branch_policy:
+          protected_branches: true
+          custom_branch_policies: false
+        deployment_tag_policy:
+          enabled: true
+          tag_patterns:
+            - "v*"
+            - "release-*"
+

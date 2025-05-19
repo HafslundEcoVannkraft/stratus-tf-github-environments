@@ -1,0 +1,28 @@
+# This file defines repositories and environments for Azure Container Apps deployments.
+# Configure each repository with appropriate environments, reviewers, and deployment policies.
+# See documentation for full details on all available options.
+
+# repositories:
+#   - repo: "your-repo-name"  # GitHub repository name (without organization)
+#     environments:
+#       - name: "development"  # Environment name
+#         wait_timer: 0        # Optional: Wait time in minutes before deployments
+#         prevent_self_review: false  # Optional: Prevent users from approving their own deployments
+#         reviewers:           # Optional: Required reviewers for deployments
+#           users:
+#             - username: "github-username"
+#           teams:
+#             - name: "team-name"
+#         # Branch restrictions (choose one approach)
+#         deployment_branch_policy:
+#           protected_branches: false   # Use protected branches only
+#           custom_branch_policies: true  # Use custom branch patterns
+#           custom_branches:
+#             - "main"
+#             - "feature/*"
+#         # Tag restrictions (optional)
+#         deployment_tag_policy:
+#           enabled: false
+#           tag_patterns: []
+#
+# # See the example directory for more complete examples of dev/staging/prod configurations
