@@ -1,4 +1,4 @@
-name: Vend ACA GitHub Environments
+name: Create ACA GitHub Environments
 
 on:
   workflow_dispatch:
@@ -43,9 +43,28 @@ env:
   DEPLOYMENT_DIR: .deployment-temp
 
 jobs:
+  get-environment:
+    name: Get environment from tfvars
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.tfvars.outputs.environment }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Get environment from tfvars file
+        id: tfvars
+        run: |
+          # Load variables from tfvars file
+          TFVARS_FILE="${{ github.event.inputs.tfvars_file }}"
+          # Get the value of environment: inside this file
+          ENVIRONMENT=$(grep 'environment:' "$TFVARS_FILE" | cut -d ':' -f2 | tr -d ' "')
+          # Append -apply to the environment variable
+          ENVIRONMENT="$ENVIRONMENT-apply"
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
   deploy:
     name: Deploy GitHub Environments
     runs-on: ubuntu-latest
+    environment: ${{ needs.get-environment.outputs.environment }}
     
     steps:
       - name: Checkout repository
@@ -59,9 +78,9 @@ jobs:
       - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ var.AZURE_CLIENT_ID }}
+          tenant-id: ${{ var.AZURE_TENANT_ID }}
+          subscription-id: ${{ var.AZURE_SUBSCRIPTION_ID }}
 
       - name: Load tfvars file
         id: tfvars
