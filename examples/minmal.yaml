@@ -1,0 +1,10 @@
+# Minimal configuration for Azure Container App GitHub Environments
+repositories:
+  - repo: your-app-repo
+    environments:
+      - name: dev
+        wait_timer: 0
+        prevent_self_review: false
+        reviewers:
+          users: []
+          teams: []

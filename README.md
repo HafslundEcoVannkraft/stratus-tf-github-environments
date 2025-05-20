@@ -45,6 +45,7 @@ graph LR
 - [Features](#features)
 - [Prerequisites](#prerequisites)
 - [Usage](#usage)
+- [Quick Setup Guide](#quick-setup-guide)
 - [Configuration Reference](#configuration-reference)
   - [YAML Structure](#yaml-structure)
   - [Reviewers Configuration](#reviewers-configuration)
@@ -89,91 +90,102 @@ This module is specifically focused on setting up the connection between GitHub 
 - Azure subscription with contributor rights
 - Terraform >= 1.3.0
 
-## Usage
+## Quick Setup Guide
 
-1. **Prepare your configuration**
+Setting up GitHub Environment vending in your IaC repository is a simple process:
 
-Make sure you have your required variables defined in a tfvars file (for example: `deployments/tfvars/<environment>.tfvars`).
+### 1. Copy Required Files
 
-2. **Create a `stratus-aca-github-environments.yaml` file**
+You need two files in your IaC repository:
 
+1. Download the GitHub workflow file to your existing `.github/workflows` directory:
+   
+   From your IaC repo root folder, run:
+   ```bash
+   # Create the workflows directory if it doesn't exist
+   mkdir -p .github/workflows
+   
+   # Download the workflow file
+   curl -o .github/workflows/vend-aca-github-environments.yml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/.github/workflows/vend-aca-github-environments.yml
+   ```
+
+2. Download the environment configuration template to your deployments directory:
+   ```bash
+   # Create the deployments directory if it doesn't exist
+   mkdir -p deployments
+   
+   # For minimal configuration (recommended for beginners)
+   curl -o deployments/stratus-aca-github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/minmal.yaml
+   
+   # Or for complete configuration
+   curl -o deployments/stratus-aca-github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/test/stratus-aca-github-environments.yaml
+   ```
+
+### 2. Customize the Environment Configuration
+
+Edit `deployments/stratus-aca-github-environments.yaml` to specify:
+
+1. The GitHub repository name(s) where you want to enable environments
+2. The environment configuration for each repository
+
+Example (minimal):
 ```yaml
 repositories:
-  - repo: api-service
+  - repo: your-app-repo-name
     environments:
-      - name: development
+      - name: dev
         wait_timer: 0
         prevent_self_review: false
         reviewers:
-          users:
-            - username: "johndoe"
-          teams:
-            - name: "developers"
-        deployment_branch_policy:
-          protected_branches: false
-          custom_branch_policies: true
-          custom_branches:
-            - "main"
-            - "feature/*"
-        deployment_tag_policy:
-          enabled: false
-          tag_patterns: []
-      - name: production
-        wait_timer: 10
-        prevent_self_review: true
-        reviewers:
-          users:
-            - username: "security-admin"
-          teams:
-            - name: "approvers"
-        deployment_branch_policy:
-          protected_branches: true 
-          custom_branch_policies: false
-        deployment_tag_policy:
-          enabled: true
-          tag_patterns:
-            - "v*"
-            - "release-*"
+          users: []
+          teams: []
 ```
 
-3. **Run the GitHub Actions workflow**
+### 3. Commit, Push and Merge Changes
 
-The recommended and secure way to apply this configuration is to use the GitHub CLI to trigger the provided workflow. This workflow will handle all Terraform operations for you.
+Follow your team's standard workflow to get your changes into the main branch:
 
-You can use either the GitHub CLI authentication token (preferred) or a personal access token (PAT) as the input. The CLI token is typically short-lived and more secure for this purpose.
+1. Create a feature branch (if not already on one)
+   ```bash
+   git checkout -b feature/add-github-environments
+   ```
 
-To get your current GitHub CLI token:
+2. Commit your changes
+   ```bash
+   git add .github/workflows/vend-aca-github-environments.yml deployments/stratus-aca-github-environments.yaml
+   git commit -m "Add GitHub environments configuration for ACA"
+   ```
 
-```bash
-gh auth token
-```
+3. Push your changes and create a PR
+   ```bash
+   git push -u origin feature/add-github-environments
+   ```
 
-Then trigger the workflow (replace `<token>` with your CLI token or PAT, `<tfvars>` with the path to your tfvars file, and `<branch>` with the branch containing your configuration if not default):
+4. Create and merge the PR to the main branch through your Git provider's interface
 
-```bash
-gh workflow run vend-github-environments.yml -f github_token=<token> -f tfvars_path=<tfvars> -b <branch>
-```
+### 4. Run the Workflow
 
-- The required inputs to the workflow are the `github_token` and the path to your `tfvars` file.
-- The workflow will automatically use your `stratus-aca-github-environments.yaml` file and provision all resources as described above.
+Once your changes are merged to the main branch, run the workflow using GitHub CLI:
 
-#### Required Token Permissions
+1. First, ensure you have a GitHub token with the proper permissions:
+   ```bash
+   # Using GitHub CLI on an authorized environment with network access
+   gh auth login --web --scopes "repo,workflow,read:org,write:packages"
+   
+   # Verify you have a token with the required scopes
+   gh auth status
+   ```
 
-The token you use (whether from `gh auth token` or a personal access token) **must** have the following GitHub scopes:
-- `repo`
-- `workflow`
-- `read:org`
-- `write:packages` (if you use GitHub Packages)
+2. Run the workflow with your token:
+   ```bash
+   gh workflow run vend-aca-github-environments.yml -f github_token=$(gh auth token) -f tfvars_path=deployments/tfvars/<environment>.tfvars
+   ```
 
-If you need to create or verify a token for workflow dispatch:
+Where `<environment>` is your environment name (e.g., `dev`, `test`, `prod`).
 
-```bash
-# Using GitHub CLI on an authorized environment with network access
-gh auth login --web --scopes "repo,workflow,read:org,write:packages"
+### 5. Verify the Results
 
-# Copy the token for use in the workflow
-gh auth token
-```
+Check the GitHub environments in your application repository and the federated credentials in Azure.
 
 ## Configuration Reference
 
@@ -257,12 +269,6 @@ This allows branches matching specific patterns to deploy. Patterns support:
 - Wildcards (`release/*`)
 - Complex patterns (`feature/**`)
 
-**Important Constraints:**
-- You **cannot** set both `protected_branches` and `custom_branch_policies` to `false`
-- If using `custom_branch_policies: true`, you must provide at least one pattern
-- If using `protected_branches: true`, leave `custom_branches` empty or omit it
-- ⚠️ **Critical limitation**: You **cannot** use `protected_branches: true` in the same environment as tag policies. GitHub's API does not support this combination.
-
 ### Tag Policies
 
 Tag-based deployment rules limit which tags can deploy to an environment:
@@ -277,9 +283,29 @@ deployment_tag_policy:
 
 When enabled, only tags matching the specified patterns can be deployed to the environment. This controls which tags can trigger deployments via GitHub Actions workflows, but does not provide tag protection (preventing tag deletion) which should be configured separately using GitHub repository settings or other modules.
 
-**Important Constraints:**
-- ⚠️ **Critical limitation**: You **cannot** use tag policies with environments that have `protected_branches: true`. These settings are mutually exclusive in GitHub's API.
-- If you need both protected branches and tag-based deployments, create separate environments for each purpose.
+### Key Configuration Constraints
+
+**GitHub Environment Configuration Limitations:**
+
+1. **Branch Policy Constraints:**
+   - You cannot set both `protected_branches` and `custom_branch_policies` to `false`
+   - If using `custom_branch_policies: true`, you must provide at least one pattern
+   - If using `protected_branches: true`, leave `custom_branches` empty or omit it
+
+2. **Tag Policy Constraints:**
+   - Tag policies do not protect tags from deletion (configure tag protection separately)
+
+3. **Critical API Limitations:**
+   - You cannot use `protected_branches: true` in the same environment as tag policies
+   - These settings are mutually exclusive in GitHub's API
+   - If you need both protected branches and tag-based deployments, create separate environments for each purpose
+
+4. **GitHub API Behavior:**
+   - GitHub's API enforces only one deployment branch pattern per environment
+   - The module prioritizes tag patterns if tag deployments are provided
+   - Multiple patterns defined in your YAML remain as documentation, but only one can be enforced
+
+This module works around these limitations as much as possible, but some combinations of settings may not be supported due to GitHub API constraints.
 
 ### Environment Variables and Secrets
 
@@ -297,7 +323,9 @@ secrets:
     value: "another-secret-value"
 ```
 
-**Note**: In Stratus, Terraform state is considered secure and is stored in a highly protected storage account with private endpoints only. However, this version of the module only supports static secrets defined directly in the YAML file. 
+**Note**: This version of the module only supports static secrets defined directly in the YAML file. 
+
+> **Important**: Container App deployments using Azure OIDC federation typically don't need GitHub Environment secrets for Azure authentication. If you need environment secrets for build steps or third-party services, consider creating them manually in GitHub until a future version supports dynamic secret substitution during runtime.
 
 Future versions will support secret substitution from GitHub workflow environment variables, GitHub secrets, and references to Azure Key Vault for even greater security and flexibility in production environments.
 
@@ -323,11 +351,22 @@ For each environment, the following Azure resources are created:
 
 ## GitHub Action Integration
 
-> **Note:**
-> For most users, you do **not** need to manually create a workflow to use the federated credentials. The required workflow is generated and managed for you as part of the Stratus onboarding process.
-> The following example is provided for advanced users who want to integrate the federated credentials into custom GitHub Actions workflows.
+Once this module has been applied, your GitHub workflows can use the automatically configured environments and federated credentials to deploy to Azure Container Apps.
 
-To use the created federated credentials in your GitHub workflow:
+The module sets up these environment variables for use in GitHub Actions:
+- `AZURE_CLIENT_ID` - The managed identity client ID for GitHub OIDC federation
+- `AZURE_TENANT_ID` - The Azure tenant ID
+- `AZURE_SUBSCRIPTION_ID` - The Azure subscription ID
+- `ACR_NAME` - Container registry name
+- `CONTAINER_APP_ENVIRONMENT_ID` - Target environment for deployments
+- `CONTAINER_APP_ENVIRONMENT_CLIENT_ID` - Client ID of the managed identity for ACR authentication
+- `BACKEND_AZURE_RESOURCE_GROUP_NAME` - Resource group for Terraform state
+- `BACKEND_AZURE_STORAGE_ACCOUNT_NAME` - Storage account for Terraform state
+- `BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME` - Container for state files
+
+### Example Workflow for Container App Deployment
+
+Here's how to use these environments in your application repository's GitHub workflow:
 
 ```yaml
 name: Deploy to Azure Container Apps
@@ -335,12 +374,13 @@ name: Deploy to Azure Container Apps
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Reference the environment name exactly as created by this module
+    # Reference the environment name exactly as configured in stratus-aca-github-environments.yaml
     environment: production
     
     # Required permissions for OIDC token
@@ -359,59 +399,30 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Log in to Azure Container Registry (ACR)
+      - name: Log in to Azure Container Registry
         run: |
           az acr login --name ${{ vars.ACR_NAME }}
 
-      - name: Build Docker image
+      - name: Build and push Docker image
         run: |
           docker build -t ${{ vars.ACR_NAME }}.azurecr.io/myapp:${{ github.sha }} .
-
-      - name: Push Docker image to ACR
-        run: |
           docker push ${{ vars.ACR_NAME }}.azurecr.io/myapp:${{ github.sha }}
 
-      # Optionally, create a new resource group for the app (if not already created)
-      - name: Create resource group for app
-        run: |
-          az group create \
-            --name myapp-app-rg-${{ github.run_id }} \
-            --location ${{ vars.AZURE_REGION || 'norwayeast' }}
-
-      # Optionally, create a new Azure Container App using the built image
-      # Uses the managed identity for ACR authentication (recommended)
-      # Doc reference: https://learn.microsoft.com/en-us/cli/azure/containerapp?view=azure-cli-latest#az-containerapp-create(containerapp)
-      - name: Create Azure Container App (if not already created)
-        run: |
-          az containerapp create \
-            --name my-container-app \
-            --resource-group myapp-app-rg-${{ github.run_id }} \
-            --environment ${{ vars.CONTAINER_APP_ENVIRONMENT_ID }} \
-            --image ${{ vars.ACR_NAME }}.azurecr.io/myapp:${{ github.sha }} \
-            --registry-server ${{ vars.ACR_NAME }}.azurecr.io \
-            --registry-identity ${{ vars.CONTAINER_APP_ENVIRONMENT_CLIENT_ID }} \
-            --ingress external --target-port 80
-
-      # Or update an existing Container App with the new image
       - name: Update Azure Container App
         run: |
           az containerapp update \
             --name my-container-app \
-            --resource-group myapp-app-rg-${{ github.run_id }} \
+            --resource-group my-resource-group \
             --image ${{ vars.ACR_NAME }}.azurecr.io/myapp:${{ github.sha }}
+```
 
-      # Add your own deployment steps as needed
+For more advanced deployment patterns, you may want to:
 
-The module automatically sets the following environment variables that can be used in GitHub Action workflows:
-- `AZURE_CLIENT_ID` - The managed identity client ID for GitHub OIDC federation
-- `AZURE_TENANT_ID` - The Azure tenant ID
-- `AZURE_SUBSCRIPTION_ID` - The Azure subscription ID
-- `ACR_NAME` - Container registry name for image storage
-- `CONTAINER_APP_ENVIRONMENT_ID` - Target environment for deployments
-- `CONTAINER_APP_ENVIRONMENT_CLIENT_ID` - The client ID of the managed identity assigned to the Azure Container App Environment (for ACR authentication)
-- `BACKEND_AZURE_RESOURCE_GROUP_NAME` - Resource group for Terraform state
-- `BACKEND_AZURE_STORAGE_ACCOUNT_NAME` - Storage account for Terraform state
-- `BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME` - Container for state files
+1. **Separate plan and apply jobs** with different environments and protection levels
+2. **Use different environments** for dev, staging, and production
+3. **Add approval gates** for production deployments
+
+Refer to the "Understanding GitHub Environments and Deployments" section for best practices.
 
 ## Common Issues and Troubleshooting
 
@@ -485,14 +496,13 @@ If you need to manage environments in organization repositories, ensure your tok
 
 #### GitHub API Limitations with Deployment Policies
 
-GitHub has a limitation: **you can only have one deployment branch pattern per environment**. This means:
+GitHub has limitations on how deployment policies can be configured:
 
-- If you have both branch patterns and tag patterns, only one can be active
-- The module prioritizes tag patterns (`refs/tags/*`) if tag deployments are provided in the yaml manifest.
-- Otherwise, it uses the first branch pattern from your configuration
-- The multiple branch or tag patterns defined in your YAML remain as documentation, but only one can be enforced by GitHub's API
+1. **One pattern type per environment:** You can only have branch patterns OR tag patterns active
+2. **Mutually exclusive settings:** Protected branches and tag policies cannot be used together
+3. **Multiple patterns as documentation:** While you can define multiple patterns in your configuration, GitHub enforces only one pattern type
 
-While the module makes this work as well as possible within GitHub's constraints, be aware that you cannot have both granular branch patterns and tag patterns simultaneously in a single environment. If you need both, consider creating separate environments for branch and tag deployments.
+These limitations are inherent to GitHub's API implementation, not the module itself.
 
 #### GitHub API Inconsistencies
 
@@ -500,14 +510,14 @@ GitHub's API can also be inconsistent when managing deployment policies:
 
 - Some environments may trigger 404 errors when adding deployment policies
 - The module includes a 45-second wait time to mitigate these issues
-- **Conflicting configurations**: Environments with both `protected_branches: true` and `deployment_tag_policy.enabled: true` are especially problematic
+- Environments with conflicting configurations are especially problematic
 - The module excludes known problematic combinations to prevent failures
 
-If you encounter persistent errors with specific environments, consider:
-  1. Avoid mixing protected branch policies and tag policies in the same environment
-  2. Create dedicated environments for tag-based deployments without branch policies
-  3. Manually create the deployment policies in the GitHub UI
-  4. Use the GitHub CLI to manage these policies outside of Terraform
+If you encounter persistent errors with specific environments, consider these workarounds:
+1. Avoid mixing protected branch policies and tag policies in the same environment
+2. Create dedicated environments for tag-based deployments without branch policies
+3. Manually create the deployment policies in the GitHub UI
+4. Use the GitHub CLI to manage these policies outside of Terraform
 
 These issues appear to be related to GitHub's API implementation, not with the module itself.
 
@@ -623,7 +633,7 @@ This eliminates the need for long-lived service principal secrets and provides a
 
 ### Recommended Workflow Configurations
 
-Here's an example GitHub Actions workflow that leverages the environments created by this module:
+For a practical implementation using the environments created by this module, consider this pattern:
 
 ```yaml
 name: Deploy Container App
@@ -637,7 +647,7 @@ on:
 jobs:
   plan:
     runs-on: ubuntu-latest
-    environment: app-dev-plan
+    environment: app-dev-plan  # Lower restrictions for planning
     permissions:
       id-token: write
       contents: read
@@ -654,13 +664,13 @@ jobs:
       
       - name: Plan Deployment
         run: |
-          echo "Planning deployment to development environment"
-          # Your planning steps here
+          echo "Planning deployment..."
+          # Planning steps here
   
   deploy:
     needs: plan
     runs-on: ubuntu-latest
-    environment: app-dev-apply
+    environment: app-dev-apply  # Higher restrictions for applying changes
     permissions:
       id-token: write
       contents: read
@@ -675,17 +685,12 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       
-      - name: Build and Push Image
+      - name: Deploy
         run: |
-          az acr build --image myapp:${{ github.sha }} --registry ${{ vars.ACR_NAME }} --file Dockerfile .
-      
-      - name: Deploy Container App
-        uses: azure/container-apps-deploy-action@v1
-        with:
-          resourceGroup: myResourceGroup
-          name: my-container-app
-          image: ${{ vars.ACR_NAME }}.azurecr.io/myapp:${{ github.sha }}
+          # Deployment steps here
 ```
+
+This pattern allows you to separate planning from execution, with appropriate protection rules for each stage.
 
 ## GitHub Actions Workflow Example
 

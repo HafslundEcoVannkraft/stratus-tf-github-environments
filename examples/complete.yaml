@@ -1,0 +1,40 @@
+# Complete configuration for Azure Container App GitHub Environments
+repositories:
+  - repo: your-app-repo
+    environments:
+      # Development: Minimal restrictions
+      - name: dev
+        wait_timer: 0
+        prevent_self_review: false
+        reviewers:
+          users: []
+          teams: []
+        # No branch policy means minimal restrictions
+
+      # Staging: Short wait, required approvals, protected branches
+      - name: staging
+        wait_timer: 10
+        prevent_self_review: true
+        reviewers:
+          users:
+            - username: "your-username"
+          teams:
+            - name: "your-approvers-team"
+        deployment_branch_policy:
+          protected_branches: true
+          custom_branch_policies: false
+
+      # Production: Longer wait, required approvals, tag restrictions
+      - name: prod
+        wait_timer: 30
+        prevent_self_review: true
+        reviewers:
+          users:
+            - username: "your-username"
+          teams:
+            - name: "your-approvers-team"
+        deployment_tag_policy:
+          enabled: true
+          tag_patterns:
+            - "v*"
+            - "release-*"

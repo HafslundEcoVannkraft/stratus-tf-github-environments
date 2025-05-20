@@ -101,8 +101,8 @@ jobs:
           mkdir -p ${{ env.DEPLOYMENT_DIR }}
           
           # Download template files from the GitHub repository
-          curl -s https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/workflow-templates/main.tf -o ${{ env.DEPLOYMENT_DIR }}/main.tf
-          curl -s https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/workflow-templates/variables.tf -o ${{ env.DEPLOYMENT_DIR }}/variables.tf
+          curl -s https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/workflow-templates/main.tf -o ${{ env.DEPLOYMENT_DIR }}/main.tf
+          curl -s https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/workflow-templates/variables.tf -o ${{ env.DEPLOYMENT_DIR }}/variables.tf
           
           # Create tfvars file for the deployment
           cat > ${{ env.DEPLOYMENT_DIR }}/deployment.auto.tfvars << EOF
