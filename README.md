@@ -4,6 +4,271 @@
 
 ---
 
+## Table of Contents
+
+- [Quick Setup Guide](#quick-setup-guide)
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Understanding Environment Types](#understanding-environment-types)
+- [How This Module Fits in the Stratus Workflow](#how-this-module-fits-in-the-stratus-workflow)
+- [Configuration Reference](#configuration-reference)
+  - [YAML Structure](#yaml-structure)
+  - [Reviewers Configuration](#reviewers-configuration)
+  - [Branch Policies](#branch-policies)
+  - [Tag Policies](#tag-policies)
+  - [Environment Variables and Secrets](#environment-variables-and-secrets)
+- [Azure Resources Created](#azure-resources-created)
+- [GitHub Action Integration](#github-action-integration)
+- [Common Issues and Troubleshooting](#common-issues-and-troubleshooting)
+- [Understanding GitHub Environments and Deployments](#understanding-github-environments-and-deployments)
+  - [What are GitHub Environments?](#what-are-github-environments)
+  - [How Environments Work with GitHub Actions](#how-environments-work-with-github-actions)
+  - [Best Practices for Environment Configuration](#best-practices-for-environment-configuration)
+  - [Security Considerations with OIDC Federation](#security-considerations-with-oidc-federation)
+  - [Common Troubleshooting](#common-troubleshooting)
+  - [Recommended Workflow Configurations](#recommended-workflow-configurations)
+- [GitHub Actions Workflow Example](#github-actions-workflow-example)
+
+## Quick Setup Guide
+
+Setting up GitHub Environment vending in your IaC repository is a simple process:
+
+### 1. Copy Required Files
+
+You need two files in your IaC repository:
+
+1. Download the GitHub workflow file to your existing `.github/workflows` directory:
+   
+   From your IaC repo root folder, run:
+   ```bash
+   # Create the workflows directory if it doesn't exist
+   mkdir -p .github/workflows
+   
+   # Download the workflow file
+   curl -o .github/workflows/vend-aca-github-environments.yml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/.github/workflows/vend-aca-github-environments.yml
+   ```
+
+2. Download the environment configuration template to your deployments directory:
+   ```bash
+   # Create the deployments directory if it doesn't exist
+   mkdir -p deployments
+   
+   # For minimal configuration (recommended for beginners)
+   curl -o deployments/stratus-aca-github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/minmal.yaml
+   
+   # Or for complete configuration
+   curl -o deployments/stratus-aca-github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/test/stratus-aca-github-environments.yaml
+   ```
+
+> **Note**: You can place the `stratus-aca-github-environments.yaml` file anywhere in your repository. The workflow will search for it recursively from the repo root. You only need to specify the filename, not the full path.
+
+### 2. Customize the Environment Configuration
+
+Edit `deployments/stratus-aca-github-environments.yaml` to specify:
+
+1. The GitHub repository name(s) where you want to enable environments
+2. The GitHub deployment environments to configure for each repository
+
+> **Important**: The GitHub deployment environments defined here do not need to match the Azure infrastructure environments one-to-one. You can create multiple GitHub environments (like dev-plan, dev-apply, staging, production) that deploy to a smaller number of Azure environments.
+
+Example (minimal):
+```yaml
+repositories:
+  - repo: your-app-repo-name
+    environments:
+      - name: dev
+        wait_timer: 0
+        prevent_self_review: false
+        reviewers:
+          users: []
+          teams: []
+```
+
+### 3. Commit, Push and Merge Changes
+
+Follow your team's standard workflow to get your changes into the main branch:
+
+1. Create a feature branch (if not already on one)
+   ```bash
+   git checkout -b feature/add-github-environments
+   ```
+
+2. Commit your changes
+   ```bash
+   git add .github/workflows/vend-aca-github-environments.yml deployments/stratus-aca-github-environments.yaml
+   git commit -m "Add GitHub environments configuration for ACA"
+   ```
+
+3. Push your changes and create a PR
+   ```bash
+   git push -u origin feature/add-github-environments
+   ```
+
+4. Create and merge the PR to the main branch through your Git provider's interface
+
+### 4. Run the Workflow
+
+Once your changes are merged to the main branch, run the workflow using GitHub CLI:
+
+1. First, ensure you have a GitHub token with the proper permissions:
+   ```bash
+   # Using GitHub CLI on an authorized environment with network access
+   gh auth login --web --scopes "repo,workflow,read:org,write:packages"
+   
+   # Verify you have a token with the required scopes
+   gh auth status
+   ```
+
+2. Run the workflow with your token:
+   ```bash
+   gh workflow run vend-aca-github-environments.yml -f github_token=$(gh auth token) -f tfvars_file=<environment>.tfvars
+   ```
+
+   Where `<environment>` is your Azure infrastructure environment name (e.g., `dev`, `test`, `prod`). This tfvars file contains:
+   - Azure subscription details
+   - Resource group information
+   - Storage account configuration for Terraform state
+   - Reference to pre-existing Container App Environment resources
+
+> **Note about Configuration File**: If you're using the default filename `stratus-aca-github-environments.yaml`, you don't need to specify it when running the workflow. If you renamed the file, include the parameter `-f github_env_file=<your-filename>.yaml`.
+
+> **Simplified File Parameters**: Both `github_env_file` and `tfvars_file` parameters accept just filenames without paths. The workflow will search for these files recursively from the repository root and use the first matching file found.
+
+> **Environment Relationship**: The Azure infrastructure environment specified in your tfvars file provides the resources and identities that your GitHub deployment environments will use. A single Azure environment can be targeted by multiple GitHub environments with different approval gates and protections.
+
+### 5. Verify the Results
+
+Check the GitHub environments in your application repository and the federated credentials in Azure.
+
+## Features
+
+- **GitHub Environment Management**: Automatically create and configure environments in GitHub repositories
+- **OIDC Federation**: Establish secure, token-based authentication between GitHub Actions and Azure
+- **Azure Role Assignments**: Set up proper Azure RBAC for each environment
+- **Deployment Branch Policies**: Control which branches can deploy to specific environments
+- **Deployment Tag Policies**: Create tag-based deployment rules for environments
+- **Required Approvals**: Establish approval requirements for deployments
+- **Configuration as Code**: Define your entire setup using YAML
+
+### What this module does NOT handle
+
+- **Tag Protection**: This module doesn't configure tag protection rules (preventing tags from being deleted)
+- **Branch Protection**: This module doesn't set up branch protection rules at the repository level
+- **Repository Creation**: Repositories must already exist before using this module
+- **Organization Management**: Organization settings are not managed by this module
+
+This module is specifically focused on setting up the connection between GitHub Actions environments and Azure Container Apps, with appropriate security controls.
+
+## Prerequisites
+
+- GitHub repository with proper permissions
+- GitHub token with `repo` and `workflow` permissions
+- Azure subscription with contributor rights
+- Terraform >= 1.3.0
+
+## Understanding Environment Types
+
+This module works with two distinct types of environments:
+
+1. **Azure Infrastructure Environments** (specified by `tfvars_file`):
+   - Represent physical Azure environments like dev, test, or production
+   - Each has its own subscription, resource group, and Container App Environment
+   - Defined by Terraform variables in tfvars files (e.g., `dev.tfvars`, `prod.tfvars`)
+   - Usually correspond to isolated Azure subscriptions or resource groups
+
+2. **GitHub Deployment Environments** (defined in `github_env_file`):
+   - Logical environments within GitHub for deployment workflows
+   - Can be more numerous and granular than Azure environments
+   - Define approval processes, branch policies, and deployment protections
+   - Each gets its own managed identity and federated credentials
+
+These environments can have a one-to-one relationship, but often you'll have multiple GitHub deployment environments targeting the same Azure infrastructure (e.g., dev-plan, dev-apply, staging-plan, staging-apply all working with dev and staging Azure environments).
+
+**Why More GitHub Environments Than Azure Environments?**
+
+Typical application lifecycles require different levels of protection and controls for different types of operations against the same infrastructure:
+
+1. **Operation-based separation**: 
+   - **plan environments**: For read-only preview operations with minimal approvals
+   - **apply environments**: For actual deployments that make changes, requiring stricter approvals
+
+2. **Security and governance benefits**:
+   - **Different approval requirements** for each operation type
+   - **Granular access control** - some team members can plan but not apply
+   - **Separate branch policies** - feature branches can plan but only main can apply 
+   - **Distinct audit trails** for who performed which operation types
+
+3. **Practical example**:
+   A single "dev" Azure subscription might have multiple GitHub environments:
+   - `dev-plan` - No approvals, any branch, read-only operations
+   - `dev-apply` - Requires approvals, protected branches only, write operations 
+   - `dev-hotfix` - Special approval path for emergency fixes
+
+This approach lets you implement sophisticated deployment controls without duplicating Azure infrastructure for each operational scenario.
+
+4. **Cost optimization**:
+   - **Share Azure resources** between different stages (e.g., dev and test) while maintaining separate deployment controls
+   - **Reduce infrastructure costs** by not creating separate Azure environments for each deployment scenario
+   - **Test against production-like infrastructure** without duplicating expensive resources
+   - **Link different code branches** to the same underlying Azure resources with different protection rules
+
+For example, your organization might use a single Azure subscription with one Container App Environment for both development and testing activities, but have separate GitHub environments with different branch policies, approval requirements, and team permissions controlling access to those resources.
+
+### Environment Mapping Visualization
+
+```mermaid
+flowchart LR
+    %% Define Azure environments
+    AzureDev["Azure Dev Environment<br>Subscription A"]
+    AzureProd["Azure Prod Environment<br>Subscription B"]
+    style AzureDev fill:#d0e8ff,stroke:#0078d4,color:#0078d4
+    style AzureProd fill:#d0e8ff,stroke:#0078d4,color:#0078d4
+
+    %% Define GitHub environments 
+    GHDev["GitHub Dev Environment<br>(Frontend & Backend)"]
+    GHTest["GitHub Test Environment<br>(Frontend & Backend)"]
+    GHProd["GitHub Prod Environment<br>(Frontend & Backend)"]
+    
+    %% Style GitHub environments
+    style GHDev fill:#e8f5e9,stroke:#2e7d32,color:#2e7d32
+    style GHTest fill:#e8f5e9,stroke:#2e7d32,color:#2e7d32
+    style GHProd fill:#e8f5e9,stroke:#2e7d32,color:#2e7d32
+    
+    %% Define operations
+    PlanOp["Plan Operation<br>(Read-only)"]
+    ApplyOp["Apply Operation<br>(Deployment)"]
+    style PlanOp fill:#fff9c4,stroke:#fbc02d,color:#3e2723
+    style ApplyOp fill:#ffccbc,stroke:#e64a19,color:#3e2723
+    
+    %% Connection lines
+    GHDev --> PlanOp -.-> AzureDev
+    GHDev --> ApplyOp --> AzureDev
+    
+    GHTest --> PlanOp -.-> AzureDev
+    
+    GHProd --> PlanOp -.-> AzureProd  
+    GHProd --> ApplyOp --> AzureProd
+```
+
+**Understanding Plan and Apply Operations:**
+- Each GitHub environment supports **both plan and apply operations**
+- **Plan operations** (yellow) are read-only, preview-only actions that show what would change
+- **Apply operations** (orange) are actual deployments that make changes to Azure resources
+- The same GitHub environment can perform both operations, with different approval requirements for each
+
+**GitHub Environment Access Controls:**
+- Dev environments often allow plans with no approvals, but require approvals for apply operations
+- Test environments usually perform read-only operations against dev infrastructure 
+- Prod environments typically require strict approval processes for both plan and apply operations
+- A single GitHub environment can be configured with different protection rules for different operations
+
+**Key points about environment relationships:**
+* GitHub environments (green) define the security boundaries and approval processes
+* Operations (plan/apply) define what actions can be taken within those environments
+* Multiple GitHub environments from different repos can target the same Azure infrastructure
+* Azure environments (blue) are the actual infrastructure that operations act upon
+* The separation of environments from operations provides a flexible security model
+
 ## How This Module Fits in the Stratus Workflow
 
 This module is **not a standalone solution**. It is designed to be used as part of a larger, connected deployment process:
@@ -65,168 +330,17 @@ graph LR
 
 ---
 
-## Table of Contents
-
-- [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Usage](#usage)
-- [Quick Setup Guide](#quick-setup-guide)
-- [Configuration Reference](#configuration-reference)
-  - [YAML Structure](#yaml-structure)
-  - [Reviewers Configuration](#reviewers-configuration)
-  - [Branch Policies](#branch-policies)
-  - [Tag Policies](#tag-policies)
-  - [Environment Variables and Secrets](#environment-variables-and-secrets)
-- [Azure Resources Created](#azure-resources-created)
-- [GitHub Action Integration](#github-action-integration)
-- [Common Issues and Troubleshooting](#common-issues-and-troubleshooting)
-- [Understanding GitHub Environments and Deployments](#understanding-github-environments-and-deployments)
-  - [What are GitHub Environments?](#what-are-github-environments)
-  - [How Environments Work with GitHub Actions](#how-environments-work-with-github-actions)
-  - [Best Practices for Environment Configuration](#best-practices-for-environment-configuration)
-  - [Security Considerations with OIDC Federation](#security-considerations-with-oidc-federation)
-  - [Common Troubleshooting](#common-troubleshooting)
-  - [Recommended Workflow Configurations](#recommended-workflow-configurations)
-- [GitHub Actions Workflow Example](#github-actions-workflow-example)
-
-## Features
-
-- **GitHub Environment Management**: Automatically create and configure environments in GitHub repositories
-- **OIDC Federation**: Establish secure, token-based authentication between GitHub Actions and Azure
-- **Azure Role Assignments**: Set up proper Azure RBAC for each environment
-- **Deployment Branch Policies**: Control which branches can deploy to specific environments
-- **Deployment Tag Policies**: Create tag-based deployment rules for environments
-- **Required Approvals**: Establish approval requirements for deployments
-- **Configuration as Code**: Define your entire setup using YAML
-
-### What this module does NOT handle
-
-- **Tag Protection**: This module doesn't configure tag protection rules (preventing tags from being deleted)
-- **Branch Protection**: This module doesn't set up branch protection rules at the repository level
-- **Repository Creation**: Repositories must already exist before using this module
-- **Organization Management**: Organization settings are not managed by this module
-
-This module is specifically focused on setting up the connection between GitHub Actions environments and Azure Container Apps, with appropriate security controls.
-
-## Prerequisites
-
-- GitHub repository with proper permissions
-- GitHub token with `repo` and `workflow` permissions
-- Azure subscription with contributor rights
-- Terraform >= 1.3.0
-
-## Quick Setup Guide
-
-Setting up GitHub Environment vending in your IaC repository is a simple process:
-
-### 1. Copy Required Files
-
-You need two files in your IaC repository:
-
-1. Download the GitHub workflow file to your existing `.github/workflows` directory:
-   
-   From your IaC repo root folder, run:
-   ```bash
-   # Create the workflows directory if it doesn't exist
-   mkdir -p .github/workflows
-   
-   # Download the workflow file
-   curl -o .github/workflows/vend-aca-github-environments.yml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/.github/workflows/vend-aca-github-environments.yml
-   ```
-
-2. Download the environment configuration template to your deployments directory:
-   ```bash
-   # Create the deployments directory if it doesn't exist
-   mkdir -p deployments
-   
-   # For minimal configuration (recommended for beginners)
-   curl -o deployments/stratus-aca-github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/minmal.yaml
-   
-   # Or for complete configuration
-   curl -o deployments/stratus-aca-github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/test/stratus-aca-github-environments.yaml
-   ```
-
-> **Note**: You can place the `stratus-aca-github-environments.yaml` file anywhere in your repository. The workflow will search for it recursively from the repo root. You only need to specify the filename, not the full path.
-
-### 2. Customize the Environment Configuration
-
-Edit `deployments/stratus-aca-github-environments.yaml` to specify:
-
-1. The GitHub repository name(s) where you want to enable environments
-2. The environment configuration for each repository
-
-Example (minimal):
-```yaml
-repositories:
-  - repo: your-app-repo-name
-    environments:
-      - name: dev
-        wait_timer: 0
-        prevent_self_review: false
-        reviewers:
-          users: []
-          teams: []
-```
-
-### 3. Commit, Push and Merge Changes
-
-Follow your team's standard workflow to get your changes into the main branch:
-
-1. Create a feature branch (if not already on one)
-   ```bash
-   git checkout -b feature/add-github-environments
-   ```
-
-2. Commit your changes
-   ```bash
-   git add .github/workflows/vend-aca-github-environments.yml deployments/stratus-aca-github-environments.yaml
-   git commit -m "Add GitHub environments configuration for ACA"
-   ```
-
-3. Push your changes and create a PR
-   ```bash
-   git push -u origin feature/add-github-environments
-   ```
-
-4. Create and merge the PR to the main branch through your Git provider's interface
-
-### 4. Run the Workflow
-
-Once your changes are merged to the main branch, run the workflow using GitHub CLI:
-
-1. First, ensure you have a GitHub token with the proper permissions:
-   ```bash
-   # Using GitHub CLI on an authorized environment with network access
-   gh auth login --web --scopes "repo,workflow,read:org,write:packages"
-   
-   # Verify you have a token with the required scopes
-   gh auth status
-   ```
-
-2. Run the workflow with your token:
-   ```bash
-   gh workflow run vend-aca-github-environments.yml -f github_token=$(gh auth token) -f tfvars_file=<environment>.tfvars
-   ```
-
-Where `<environment>` is your environment name (e.g., `dev`, `test`, `prod`).
-
-> **Note about Configuration File**: If you're using the default filename `stratus-aca-github-environments.yaml`, you don't need to specify it when running the workflow. If you renamed the file, include the parameter `-f github_env_file=<your-filename>.yaml`.
-
-### 5. Verify the Results
-
-Check the GitHub environments in your application repository and the federated credentials in Azure.
-
 ## Configuration Reference
 
 ### YAML Structure
 
-The `stratus-aca-github-environments.yaml` file defines all repositories and their environments:
+The `stratus-aca-github-environments.yaml` file defines GitHub deployment environments for your application repositories:
 
 ```yaml
 repositories:
   - repo: "repository-name"  # GitHub repository name
     environments:
-      - name: "environment-name"  # Environment name (e.g., dev, staging, prod)
+      - name: "environment-name"  # GitHub Environment name (e.g., dev, staging, prod)
         # Environment settings follow
 ```
 
@@ -234,7 +348,7 @@ repositories:
 
 | Property | Type | Description | Default | Required |
 |----------|------|-------------|---------|----------|
-| `name` | string | Name of the environment | - | Yes |
+| `name` | string | Name of the GitHub deployment environment | - | Yes |
 | `wait_timer` | integer | Wait time (minutes) before allowing deployments | 0 | No |
 | `prevent_self_review` | boolean | Prevents people from approving their own deployments | false | No |
 | `reviewers` | object | Users and teams who must approve deployments | null | No |
@@ -242,6 +356,8 @@ repositories:
 | `deployment_tag_policy` | object | Tag-based deployment rules | null | No |
 | `variables` | object | Environment variables to create | {} | No |
 | `secrets` | array | Secrets to create | [] | No |
+
+> **Note**: Each GitHub environment defined here will get its own Azure User-Assigned Managed Identity and federated credential. This allows for granular access control and deployment permissions targeting the same underlying Azure resources.
 
 ### Reviewers Configuration
 
@@ -555,7 +671,7 @@ These issues appear to be related to GitHub's API implementation, not with the m
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | `code_name` | Project/Application code name | `string` | n/a | yes |
-| `environment` | Environment name (dev, test, prod) | `string` | n/a | yes |
+| `environment` | Azure environment name (dev, test, prod) | `string` | n/a | yes |
 | `github_token` | GitHub token for API access | `string` | n/a | yes |
 | `github_owner` | GitHub organization or user name | `string` | `HafslundEcoVannkraft` | no |
 | `location` | Azure region for resources | `string` | n/a | yes |
