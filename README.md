@@ -8,16 +8,39 @@
 
 This module is **not a standalone solution**. It is designed to be used as part of a larger, connected deployment process:
 
-> **Note**: In the diagram below, "GitHub Env Vending" refers to **this repository** (stratus-tf-aca-gh-vending).
+> **Note**: In the diagram below, "GitHub Env Vending Module" refers to **this repository** (stratus-tf-aca-gh-vending).
 
 ```mermaid
 graph LR
-    A[Infrastructure Repo] -->|Outputs| B[GitHub Env Vending<br><b>THIS REPOSITORY</b>]
-    A -->|Run Workflow| B
-    B -->|Configure| C[App Source Repos]
-    B -->|Create OIDC| C
-    C -->|Deploy| D[Azure Container Apps]
+    B["GitHub Env Vending Module<br>THIS REPO"] -.->|"1 Copy workflow file"| A[Team IaC Repo]
+    B -.-> |"2 Provide terraform<br>module"| A
+    A --> |"3 Vend new identities"| D[Team Azure Subscription]
+    A --> |"4 Configure GitHub<br>environment"| C[Team App Source Repos]
+    C --> |"5 Deploy Azure<br>Container Apps"| D
+    
+    style B fill:#006400,stroke:#333
 ```
+
+### Actual Workflow Process
+
+1. **Copy Files to IaC Repo:**  
+   Developer teams copy the workflow file and YAML config template from this repo to their IaC repo. This is necessary because the workflow must run in the context of the team's IaC repo, which has the required OIDC credentials to access Azure resources.
+
+2. **Use Terraform Module:**  
+   The workflow in the team's IaC repo references the Terraform module from this repository. This repository's primary function is to provide the module that creates and configures GitHub Environments with secure OIDC credentials.
+
+3. **Execute with IaC Permissions:**  
+   The team's IaC repo has the necessary OIDC federation with Azure to:
+   - Access the Azure Storage backend for Terraform state
+   - Deploy resources (managed identities) to the team's Azure subscription
+
+4. **Configure App Repos:**  
+   The workflow creates and configures GitHub Environments in the team's application source repositories and sets up OIDC federation between GitHub and Azure for each environment.
+
+5. **Deploy Apps:**  
+   Application developers can now use the GitHub Environments to deploy to Azure Container Apps without managing credentials, using secure OIDC federation.
+
+> **Important Path Note:** The workflow file searches for a configuration file called `stratus-aca-github-environments.yaml` in the repo root by default. The Quick Setup Guide below recommends placing it in the `deployments` directory. If you use that location, be sure to specify the full path when running the workflow.
 
 ### End-to-End Example Flow
 
@@ -694,39 +717,4 @@ This pattern allows you to separate planning from execution, with appropriate pr
 
 ## GitHub Actions Workflow Example
 
-This module includes a sample GitHub Actions workflow file [`github-action-workflow.yml`](./github-action-workflow.yml) that you can copy to your IaC repository to deploy your GitHub environments. This workflow:
-
-1. Uses `workflow_dispatch` to trigger manually from the GitHub UI or API
-2. Requires only the essential inputs for deployment:
-   - Directory path to your terraform code
-   - Path to your tfvars file
-   - GitHub token with proper permissions
-3. Supports both deployment and destruction operations
-4. Uses Azure OIDC for secure authentication
-5. Manages Terraform state automatically
-
-### Setup Instructions
-
-1. Copy the `github-action-workflow.yml` file to your repository's `.github/workflows/` directory
-2. Configure the following repository secrets in your GitHub repository:
-   - `AZURE_CLIENT_ID` - Azure service principal/managed identity client ID
-   - `AZURE_TENANT_ID` - Azure tenant ID
-   - `AZURE_SUBSCRIPTION_ID` - Azure subscription ID
-   - `STORAGE_ACCOUNT` - Azure storage account name for Terraform state
-   - `CONTAINER_NAME` - Container name within the storage account
-
-3. When triggering the workflow, provide:
-   - Directory path to your terraform code
-   - Path to your tfvars file
-   - GitHub personal access token with `repo`, `workflow`, and `read:org` permissions
-
-The workflow will initialize Terraform, plan the changes, and optionally apply or destroy the infrastructure based on your input parameters.
-
-> **Note**: For the GitHub token, it's recommended to use a token with the minimum required permissions and to consider using GitHub's OIDC federation with your secrets provider when possible.
-
----
-
-> **Note for maintainers:**
-> The JSON schema for `stratus-aca-github-environments.yaml` is located in `.schemas/repository-environments.schema.json`. It is not currently used for validation, but may be integrated with VSCode or CI workflows in the future.
-
----
+This module includes a sample GitHub Actions workflow file [`
