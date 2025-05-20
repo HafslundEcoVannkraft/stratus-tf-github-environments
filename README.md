@@ -277,13 +277,13 @@ This module is **not a standalone solution**. It is designed to be used as part 
 
 ```mermaid
 graph LR
-    B["GitHub Env Vending Module<br>THIS REPO"] -.->|"1 Copy workflow file"| A[Team IaC Repo]
+    B["GitHub Env Vending Module<br>THIS REPO"] -.->|"1 Copy workflow file"| A[IaC Repo]
     B -.-> |"2 Provide terraform<br>module"| A
-    A --> |"3 Vend new identities"| D[Team Azure Subscription]
-    A --> |"4 Configure GitHub<br>environment"| C[Team App Source Repos]
+    A --> |"3 Create new identities"| D[Azure Subscription]
+    A --> |"4 Configure GitHub<br>environment"| C[App Source Repos]
     C --> |"5 Deploy Azure<br>Container Apps"| D
     
-    style B fill:#006400,stroke:#333
+    style B fill:#e8f5e9,stroke:#2e7d32,color:#2e7d32
 ```
 
 ### Actual Workflow Process
@@ -798,10 +798,10 @@ jobs:
       contents: read
     
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Azure Login
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -821,10 +821,10 @@ jobs:
       contents: read
     
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Azure Login
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -836,7 +836,3 @@ jobs:
 ```
 
 This pattern allows you to separate planning from execution, with appropriate protection rules for each stage.
-
-## GitHub Actions Workflow Example
-
-This module includes a sample GitHub Actions workflow file [`
