@@ -11,6 +11,6 @@ module "github_environments" {
   # Variables from workflow inputs
   github_token           = var.github_token
   github_owner           = var.github_owner
-  repositories_file      = var.repositories_file
+  github_env_file        = var.github_env_file
   is_stratus_tf_examples = var.is_stratus_tf_examples
 } 

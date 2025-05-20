@@ -3,8 +3,8 @@ name: Vend ACA GitHub Environments
 on:
   workflow_dispatch:
     inputs:
-      tfvars_path:
-        description: 'Path to tfvars file (required)'
+      tfvars_file:
+        description: 'Filename of tfvars file (required, will be searched for recursively in the repository)'
         required: true
         type: string
       github_token:
@@ -16,11 +16,11 @@ on:
         required: false
         type: string
         default: 'HafslundEcoVannkraft'
-      repositories_file:
-        description: 'Path to YAML config file (optional, defaults to stratus-aca-github-environments-{environment}.yaml or stratus-aca-github-environments.yaml if environment-specific file not found)'
+      github_env_file:
+        description: 'Filename of GitHub environment config (optional, defaults to stratus-aca-github-environments.yaml)'
         required: false
         type: string
-        default: ''
+        default: 'stratus-aca-github-environments.yaml'
       is_stratus_tf_examples:
         description: 'Set to true if calling from stratus-tf-examples repo (optional, defaults to false)'
         required: false
@@ -67,20 +67,31 @@ jobs:
         id: tfvars
         run: |
           # Load variables from tfvars file
-          TFVARS_PATH="${{ github.event.inputs.tfvars_path }}"
+          TFVARS_FILE="${{ github.event.inputs.tfvars_file }}"
           
-          echo "Loading tfvars from $TFVARS_PATH"
-          if [ ! -f "$TFVARS_PATH" ]; then
-            echo "Error: tfvars file not found at $TFVARS_PATH"
+          # If only a filename was provided (no directory), search for it recursively
+          if [[ "$TFVARS_FILE" != *"/"* ]]; then
+            echo "Searching for tfvars file '$TFVARS_FILE' recursively..."
+            FOUND_TFVARS=$(find . -name "$TFVARS_FILE" -type f | head -n 1)
+            
+            if [ -n "$FOUND_TFVARS" ]; then
+              echo "Found tfvars file at: $FOUND_TFVARS"
+              TFVARS_FILE="$FOUND_TFVARS"
+            fi
+          fi
+          
+          echo "Loading tfvars from $TFVARS_FILE"
+          if [ ! -f "$TFVARS_FILE" ]; then
+            echo "Error: tfvars file not found at $TFVARS_FILE"
             exit 1
           fi
           
           # Extract required variables
-          SUBSCRIPTION_ID=$(grep 'subscription_id' "$TFVARS_PATH" | cut -d '=' -f2 | tr -d ' "')
-          LOCATION=$(grep 'location' "$TFVARS_PATH" | cut -d '=' -f2 | tr -d ' "')
-          CODE_NAME=$(grep 'code_name' "$TFVARS_PATH" | cut -d '=' -f2 | tr -d ' "')
-          ENVIRONMENT=$(grep 'environment' "$TFVARS_PATH" | cut -d '=' -f2 | tr -d ' "')
-          STATE_STORAGE_ACCOUNT=$(grep 'state_storage_account_name' "$TFVARS_PATH" | cut -d '=' -f2 | tr -d ' "')
+          SUBSCRIPTION_ID=$(grep 'subscription_id' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
+          LOCATION=$(grep 'location' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
+          CODE_NAME=$(grep 'code_name' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
+          ENVIRONMENT=$(grep 'environment' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
+          STATE_STORAGE_ACCOUNT=$(grep 'state_storage_account_name' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
           
           # Validate required variables
           if [ -z "$SUBSCRIPTION_ID" ] || [ -z "$LOCATION" ] || [ -z "$CODE_NAME" ] || [ -z "$ENVIRONMENT" ] || [ -z "$STATE_STORAGE_ACCOUNT" ]; then
@@ -116,52 +127,27 @@ jobs:
           is_stratus_tf_examples     = ${{ github.event.inputs.is_stratus_tf_examples }}
           EOF
           
-          # Note: repositories_file will be added later once we determine which file to use
-          
-          # Download and process backend configuration template
-          curl -s https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/workflow-templates/backend.conf.tmpl | \
-            sed "s/{{CODE_NAME}}/${{ steps.tfvars.outputs.code_name }}/g" | \
-            sed "s/{{ENVIRONMENT}}/${{ steps.tfvars.outputs.environment }}/g" | \
-            sed "s/{{STATE_STORAGE_ACCOUNT}}/${{ steps.tfvars.outputs.state_storage_account }}/g" \
-            > ${{ env.DEPLOYMENT_DIR }}/backend.conf
-          
-          # Determine the repositories file to use
-          REPO_FILE=""
-          
-          # If explicitly specified, try that first
-          if [ -n "${{ github.event.inputs.repositories_file }}" ]; then
-            if [ -f "${{ github.event.inputs.repositories_file }}" ]; then
-              REPO_FILE="${{ github.event.inputs.repositories_file }}"
-              echo "Using specified repositories file: $REPO_FILE"
-            else
-              echo "Error: Specified repositories file ${{ github.event.inputs.repositories_file }} not found."
-              exit 1
-            fi
-          else
-            # Try environment-specific file first
-            ENV_SPECIFIC_FILE="stratus-aca-github-environments-${{ steps.tfvars.outputs.environment }}.yaml"
-            DEFAULT_FILE="stratus-aca-github-environments.yaml"
-            
-            if [ -f "$ENV_SPECIFIC_FILE" ]; then
-              REPO_FILE="$ENV_SPECIFIC_FILE"
-              echo "Using environment-specific repositories file: $REPO_FILE"
-            elif [ -f "$DEFAULT_FILE" ]; then
-              REPO_FILE="$DEFAULT_FILE"
-              echo "Using default repositories file: $REPO_FILE"
-            else
-              echo "Error: No repositories file found. Please create either:"
-              echo "- $ENV_SPECIFIC_FILE (recommended for environment-specific configurations)"
-              echo "- $DEFAULT_FILE (for shared configurations)"
-              echo "Or specify an explicit path using the repositories_file input."
-              exit 1
-            fi
+          # Determine the GitHub environment file to use
+          ENV_FILE="${{ github.event.inputs.github_env_file }}"
+          if [ -z "$ENV_FILE" ]; then
+            ENV_FILE="stratus-aca-github-environments.yaml"
           fi
           
-          # Copy the repository environment configuration file to deployment directory
-          cp "$REPO_FILE" ${{ env.DEPLOYMENT_DIR }}/
+          # Search for the file recursively from repository root
+          FOUND_FILE=$(find . -name "$ENV_FILE" -type f | head -n 1)
           
-          # Update the repositories_file variable in the tfvars to point to the correct file in the deployment directory
-          echo "repositories_file         = \"$(basename $REPO_FILE)\"" >> ${{ env.DEPLOYMENT_DIR }}/deployment.auto.tfvars
+          if [ -z "$FOUND_FILE" ]; then
+            echo "Error: Could not find GitHub environment file '$ENV_FILE' in repository"
+            exit 1
+          fi
+          
+          echo "Found GitHub environment file at: $FOUND_FILE"
+          
+          # Copy the environment file to the deployment directory
+          cp "$FOUND_FILE" ${{ env.DEPLOYMENT_DIR }}/
+          
+          # Update the github_env_file variable in the tfvars to point to the correct file in the deployment directory
+          echo "github_env_file         = \"$(basename $FOUND_FILE)\"" >> ${{ env.DEPLOYMENT_DIR }}/deployment.auto.tfvars
           
           ls -la ${{ env.DEPLOYMENT_DIR }}/
 

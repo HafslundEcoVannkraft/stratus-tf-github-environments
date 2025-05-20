@@ -35,8 +35,8 @@ variable "github_owner" {
   default     = "HafslundEcoVannkraft"
 }
 
-variable "repositories_file" {
-  description = "Path to the YAML file containing repository and environment configurations."
+variable "github_env_file" {
+  description = "Filename of the GitHub environments configuration file. The workflow will search for this file recursively from the repository root."
   type        = string
   default     = "stratus-aca-github-environments.yaml"
 }

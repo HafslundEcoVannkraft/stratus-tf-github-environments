@@ -40,7 +40,9 @@ graph LR
 5. **Deploy Apps:**  
    Application developers can now use the GitHub Environments to deploy to Azure Container Apps without managing credentials, using secure OIDC federation.
 
-> **Important Path Note:** The workflow file searches for a configuration file called `stratus-aca-github-environments.yaml` in the repo root by default. The Quick Setup Guide below recommends placing it in the `deployments` directory. If you use that location, be sure to specify the full path when running the workflow.
+> **Important File Note:** The workflow will search for your GitHub environments configuration file (`stratus-aca-github-environments.yaml` by default) recursively from the repository root. You only need to specify the filename (not the path) when running the workflow, and the first matching file will be used.
+
+> **Simplified File Parameters**: Both `github_env_file` and `tfvars_file` parameters accept just filenames without paths. The workflow will search for these files recursively from the repository root and use the first matching file found.
 
 ### End-to-End Example Flow
 
@@ -49,7 +51,7 @@ graph LR
 
 2. **Configure GitHub Environments:**  
    - Edit `stratus-aca-github-environments.yaml` in the IaC repo to describe which app repos/environments to configure.
-   - Run the provided workflow (via GitHub CLI) with the required inputs (`github_token`, `tfvars_path`).
+   - Run the provided workflow (via GitHub CLI) with the required inputs (`github_token`, `tfvars_file`).
 
 3. **App Source Repo Usage:**  
    - Developers in the app repo can now use the configured environments for secure, OIDC-based deployments to Azure.
@@ -144,6 +146,8 @@ You need two files in your IaC repository:
    curl -o deployments/stratus-aca-github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/test/stratus-aca-github-environments.yaml
    ```
 
+> **Note**: You can place the `stratus-aca-github-environments.yaml` file anywhere in your repository. The workflow will search for it recursively from the repo root. You only need to specify the filename, not the full path.
+
 ### 2. Customize the Environment Configuration
 
 Edit `deployments/stratus-aca-github-environments.yaml` to specify:
@@ -201,10 +205,12 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
 
 2. Run the workflow with your token:
    ```bash
-   gh workflow run vend-aca-github-environments.yml -f github_token=$(gh auth token) -f tfvars_path=deployments/tfvars/<environment>.tfvars
+   gh workflow run vend-aca-github-environments.yml -f github_token=$(gh auth token) -f tfvars_file=<environment>.tfvars
    ```
 
 Where `<environment>` is your environment name (e.g., `dev`, `test`, `prod`).
+
+> **Note about Configuration File**: If you're using the default filename `stratus-aca-github-environments.yaml`, you don't need to specify it when running the workflow. If you renamed the file, include the parameter `-f github_env_file=<your-filename>.yaml`.
 
 ### 5. Verify the Results
 
@@ -553,7 +559,7 @@ These issues appear to be related to GitHub's API implementation, not with the m
 | `github_token` | GitHub token for API access | `string` | n/a | yes |
 | `github_owner` | GitHub organization or user name | `string` | `HafslundEcoVannkraft` | no |
 | `location` | Azure region for resources | `string` | n/a | yes |
-| `repositories_file` | Path to YAML config file | `string` | `"stratus-aca-github-environments.yaml"` | no |
+| `github_env_file` | Filename of GitHub environments configuration file | `string` | `"stratus-aca-github-environments.yaml"` | no |
 | `state_storage_account_name` | Storage account for Terraform state | `string` | n/a | yes |
 
 ## Notes for Single Organization Support

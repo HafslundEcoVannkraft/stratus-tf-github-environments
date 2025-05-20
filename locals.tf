@@ -4,8 +4,30 @@
 # Used for file paths, YAML parsing, backend config, and validation.
 # -----------------------------------------------------------------------------
 locals {
-  # Path to the stratus-aca-github-environments.yaml config file (overridable by var.repositories_file)
-  repositories_file = coalesce(var.repositories_file, "${path.module}/stratus-aca-github-environments.yaml")
+  # Basic environment naming
+  workspace_name = terraform.workspace == "default" ? "" : terraform.workspace
+  env_suffix     = var.environment == "" ? local.workspace_name : var.environment
+
+  # Path to the GitHub environment configuration file
+  github_env_file = coalesce(var.github_env_file, "${path.module}/stratus-aca-github-environments.yaml")
+
+  # Extract repositories and environments from the YAML file
+  yaml_content   = fileexists(local.github_env_file) ? file(local.github_env_file) : file("${path.module}/examples/minmal.yaml")
+  config         = yamldecode(local.yaml_content)
+  repositories   = local.config.repositories
+  owner          = var.github_owner
+
+  # Create a map of repositories and their environments
+  env_map = {
+    for repo in local.repositories : repo.repo => [
+      for env in repo.environments : {
+        repo = repo.repo
+        env  = env.name
+        key         = "${repo.repo}:${env.name}"
+        full_key    = "${repo.repo}-${env.name}"
+      }
+    ]
+  }
 
   # Path to the JSON schema for validating the YAML config
   schema_file = "${path.module}/schema.json"
@@ -17,13 +39,8 @@ locals {
   acr_name                            = try(local.remote_state_outputs.acr_name, "")
   acr_resource_id                     = try(local.remote_state_outputs.acr_resource_id, "")
 
-
   # Read YAML file directly and parse with yamldecode
-  yaml_content = file("${path.module}/stratus-aca-github-environments.yaml")
-  yaml_data    = yamldecode(local.yaml_content)
-
-  # Extract repositories from parsed YAML - expects all repos to be in the same organization
-  repositories = try(local.yaml_data.repositories, [])
+  yaml_data = yamldecode(local.yaml_content)
 
   # Flatten repositories and environments for identity creation
   flattened_repo_environments = flatten([

@@ -36,19 +36,19 @@ variable "github_token" {
 }
 
 variable "github_owner" {
-  description = "GitHub organization or user name for repository ownership. Defaults to the HafslundEcoVannkraft organization."
+  description = "GitHub organization or user name for repository ownership."
   type        = string
   default     = "HafslundEcoVannkraft"
 }
 
-variable "repositories_file" {
-  description = "Path to the YAML file containing repository and environment configurations. Defaults to 'stratus-aca-github-environments.yaml' in the module directory."
+variable "github_env_file" {
+  description = "Filename of the GitHub environments configuration file. The workflow will search for this file recursively from the repository root."
   type        = string
   default     = "stratus-aca-github-environments.yaml"
 }
 
 variable "is_stratus_tf_examples" {
-  description = "Set to true if calling this module from the stratus-tf-examples repo. Used for internal testing and examples. Defaults to false."
+  description = "Set to true if calling this module from the stratus-tf-examples repo."
   type        = bool
   default     = false
 }
