@@ -12,19 +12,19 @@ locals {
   github_env_file = var.github_env_file
 
   # Extract repositories and environments from the YAML file
-  yaml_content   = fileexists(local.github_env_file) ? file(local.github_env_file) : file("${path.module}/examples/minmal.yaml")
-  config         = yamldecode(local.yaml_content)
-  repositories   = local.config.repositories
-  owner          = var.github_owner
+  yaml_content = fileexists(local.github_env_file) ? file(local.github_env_file) : file("${path.module}/examples/minmal.yaml")
+  config       = yamldecode(local.yaml_content)
+  repositories = local.config.repositories
+  owner        = var.github_owner
 
   # Create a map of repositories and their environments
   env_map = {
     for repo in local.repositories : repo.repo => [
       for env in repo.environments : {
-        repo = repo.repo
-        env  = env.name
-        key         = "${repo.repo}:${env.name}"
-        full_key    = "${repo.repo}-${env.name}"
+        repo     = repo.repo
+        env      = env.name
+        key      = "${repo.repo}:${env.name}"
+        full_key = "${repo.repo}-${env.name}"
       }
     ]
   }

@@ -3,8 +3,6 @@
 # Input variables for the stratus-tf-aca-gh-vending module.
 # Configure Azure, GitHub, and module-specific settings here.
 # -----------------------------------------------------------------------------
-
-# Variables provided by the tfvars file
 variable "subscription_id" {
   description = "Azure Subscription ID used for resource deployment."
   type        = string
@@ -31,7 +29,6 @@ variable "state_storage_account_name" {
   type        = string
 }
 
-# Variables provided as workflow inputs
 variable "github_token" {
   description = "GitHub token with permissions to create and manage environments and secrets."
   type        = string
@@ -54,4 +51,4 @@ variable "is_stratus_tf_examples" {
   description = "Set to true if calling this module from the stratus-tf-examples repo."
   type        = bool
   default     = false
-} 
+}
