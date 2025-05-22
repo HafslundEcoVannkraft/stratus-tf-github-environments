@@ -35,7 +35,7 @@ Setting up GitHub Environment vending in your IaC repository is a simple process
 
 ### 1. Copy Required Files
 
-You need two files in your IaC repository:
+You need just two files in your IaC repository:
 
 1. Download the GitHub workflow file to your existing `.github/workflows` directory:
    
@@ -48,23 +48,29 @@ You need two files in your IaC repository:
    curl -o .github/workflows/vend-aca-github-environments.yml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/.github/workflows/vend-aca-github-environments.yml
    ```
 
-2. Download the environment configuration template to your deployments directory:
+2. Create an environment configuration file in your repository - use the minimal configuragion
+
    ```bash
    # Create the deployments directory if it doesn't exist
    mkdir -p deployments
    
-   # For minimal configuration (recommended for beginners)
-   curl -o deployments/stratus-aca-github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/minmal.yaml
-   
-   # Or for complete configuration
-   curl -o deployments/stratus-aca-github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/test/stratus-aca-github-environments.yaml
+   curl -o deployments/github-envrionments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/minmal.yaml
    ```
 
-> **Note**: You can place the `stratus-aca-github-environments.yaml` file anywhere in your repository. The workflow will search for it recursively from the repo root. You only need to specify the filename, not the full path.
+3. Or use the complete configuration
+   
+   ```bash
+   # Create the deployments directory if it doesn't exist
+   mkdir -p deployments
+
+   curl -o deployments/github-envrionments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/test/complete.yaml
+   ```
+
+> **Note**: You can place the `github-envrionments.yaml` file anywhere in your repository. The workflow will search for it recursively from the repo root. You only need to specify the filename, not the full path.
 
 ### 2. Customize the Environment Configuration
 
-Edit `deployments/stratus-aca-github-environments.yaml` to specify:
+Edit `deployments/github-envrionments.yaml` to specify:
 
 1. The GitHub repository name(s) where you want to enable environments
 2. The GitHub deployment environments to configure for each repository
@@ -95,7 +101,7 @@ Follow your team's standard workflow to get your changes into the main branch:
 
 2. Commit your changes
    ```bash
-   git add .github/workflows/vend-aca-github-environments.yml deployments/stratus-aca-github-environments.yaml
+   git add .github/workflows/vend-aca-github-environments.yml deployments/github-envrionments.yaml
    git commit -m "Add GitHub environments configuration for ACA"
    ```
 
@@ -114,23 +120,34 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
    ```bash
    # Using GitHub CLI on an authorized environment with network access
    gh auth login --web --scopes "repo,workflow,read:org,write:packages"
-   
-   # Verify you have a token with the required scopes
+   ```
+
+2. Verify you have a token with the required scopes
+   ```bash   
    gh auth status
    ```
 
 2. Run the workflow with your token:
    ```bash
-   gh workflow run vend-aca-github-environments.yml -f github_token=$(gh auth token) -f tfvars_file=<environment>.tfvars
+   gh workflow run vend-aca-github-environments.yml -f github_token=$(gh auth token) -f tfvars_file=<environment>.tfvars -f operation=apply
    ```
 
-   Where `<environment>` is your Azure infrastructure environment name (e.g., `dev`, `test`, `prod`). This tfvars file contains:
-   - Azure subscription details
-   - Resource group information
-   - Storage account configuration for Terraform state
-   - Reference to pre-existing Container App Environment resources
+   Where `<environment>` is your Azure infrastructure environment name (e.g., `dev`, `test`, `prod`). This tfvars file should contain:
+   - Azure subscription details (`subscription_id`)
+   - Resource group information (`resource_group_name`, optional)
+   - Storage account configuration for Terraform state (`state_storage_account_name`)
+   - Your application code name (`code_name`)
+   - Environment name (`environment`)
+   - Location (`location`)
 
-> **Note about Configuration File**: If you're using the default filename `stratus-aca-github-environments.yaml`, you don't need to specify it when running the workflow. If you renamed the file, include the parameter `-f github_env_file=<your-filename>.yaml`.
+> **How the Workflow Works**:
+> 1. The workflow checks out your IaC repo to find your configuration files
+> 2. It also checks out the public module repo directly into a `terraform-work` folder
+> 3. It copies your tfvars and environment YAML files to the `terraform-work` folder
+> 4. It runs Terraform in the context of the `terraform-work` folder
+> 5. No need to create or maintain Terraform files in your IaC repo!
+
+> **Note about Configuration File**: If you're using the default filename `github-envrionments.yaml`, you don't need to specify it when running the workflow. If you renamed the file, include the parameter `-f github_env_file=<your-filename>.yaml`.
 
 > **Simplified File Parameters**: Both `github_env_file` and `tfvars_file` parameters accept just filenames without paths. The workflow will search for these files recursively from the repository root and use the first matching file found.
 
@@ -278,34 +295,48 @@ This module is **not a standalone solution**. It is designed to be used as part 
 ```mermaid
 graph LR
     B["GitHub Env Vending Module<br>THIS REPO"] -.->|"1 Copy workflow file"| A[IaC Repo]
-    B -.-> |"2 Provide terraform<br>module"| A
+    B -.-> |"2 Provide terraform<br>module code"| A
     A --> |"3 Create new identities"| D[Azure Subscription]
-    A --> |"4 Configure GitHub<br>environment"| C[App Source Repos]
+    A --> |"4 Configure GitHub<br>environments"| C[App Source Repos]
     C --> |"5 Deploy Azure<br>Container Apps"| D
     
     style B fill:#e8f5e9,stroke:#2e7d32,color:#2e7d32
+    
+    subgraph "Why use IaC Repo?"
+        E["Azure Identity (OIDC)<br>for Subscription Access"]
+        F["VNet Connectivity<br>to Private Terraform Backend"]
+    end
+    
+    A --- E
+    A --- F
 ```
 
 ### Actual Workflow Process
 
-1. **Copy Files to IaC Repo:**  
-   Developer teams copy the workflow file and YAML config template from this repo to their IaC repo. This is necessary because the workflow must run in the context of the team's IaC repo, which has the required OIDC credentials to access Azure resources.
+1. **Copy Workflow to IaC Repo:**  
+   Developer teams only need to copy the workflow file and YAML config template from this repo to their IaC repo. The workflow must run in the context of the team's IaC repo for two critical reasons:
+   - **Azure Identity**: The IaC repo has the required OIDC credentials to access Azure resources and Terraform state
+   - **Network Access**: The IaC repo has VNet connectivity to the private Terraform backend storage account
 
-2. **Use Terraform Module:**  
-   The workflow in the team's IaC repo references the Terraform module from this repository. This repository's primary function is to provide the module that creates and configures GitHub Environments with secure OIDC credentials.
+2. **No Need for Local Terraform Files:**  
+   The workflow automatically checks out the latest version of this module directly from GitHub. You do not need to create or maintain any Terraform files in your IaC repo - just the workflow and configuration files.
 
 3. **Execute with IaC Permissions:**  
    The team's IaC repo has the necessary OIDC federation with Azure to:
-   - Access the Azure Storage backend for Terraform state
+   - Access the Azure Storage backend for Terraform state (often behind private endpoints)
    - Deploy resources (managed identities) to the team's Azure subscription
 
 4. **Configure App Repos:**  
    The workflow creates and configures GitHub Environments in the team's application source repositories and sets up OIDC federation between GitHub and Azure for each environment.
 
 5. **Deploy Apps:**  
-   Application developers can now use the GitHub Environments to deploy to Azure Container Apps without managing credentials, using secure OIDC federation.
+   Application developers can now use the configured environments to deploy to Azure Container Apps without managing credentials, using secure OIDC federation.
 
-> **Important File Note:** The workflow will search for your GitHub environments configuration file (`stratus-aca-github-environments.yaml` by default) recursively from the repository root. You only need to specify the filename (not the path) when running the workflow, and the first matching file will be used.
+> **Simplified File Requirements:** You only need two files in your IaC repo:
+> 1. The workflow file (`.github/workflows/vend-aca-github-environments.yml`)
+> 2. The GitHub environments configuration YAML file
+
+> **No Terraform Files Needed:** The workflow checks out the module code directly from this repository. You don't need to create any Terraform files in your IaC repo.
 
 > **Simplified File Parameters**: Both `github_env_file` and `tfvars_file` parameters accept just filenames without paths. The workflow will search for these files recursively from the repository root and use the first matching file found.
 
@@ -315,7 +346,7 @@ graph LR
    Run Terraform in your IaC repo to create ACE, ACR, etc. We recommend using the [Stratus Terraform Examples](https://github.com/HafslundEcoVannkraft/stratus-tf-examples/tree/main/examples/corp/container_app) for corporate Container Apps deployments. These examples provide tested, production-ready infrastructure patterns aligned with Stratus best practices.
 
 2. **Configure GitHub Environments:**  
-   - Edit `stratus-aca-github-environments.yaml` in the IaC repo to describe which app repos/environments to configure.
+   - Edit `github-envrionments.yaml` in the IaC repo to describe which app repos/environments to configure.
    - Run the provided workflow (via GitHub CLI) with the required inputs (`github_token`, `tfvars_file`).
 
 3. **App Source Repo Usage:**  
@@ -334,7 +365,7 @@ graph LR
 
 ### YAML Structure
 
-The `stratus-aca-github-environments.yaml` file defines GitHub deployment environments for your application repositories:
+The `github-envrionments.yaml` file defines GitHub deployment environments for your application repositories:
 
 ```yaml
 repositories:
@@ -525,7 +556,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Reference the environment name exactly as configured in stratus-aca-github-environments.yaml
+    # Reference the environment name exactly as configured in github-envrionments.yaml
     environment: production
     
     # Required permissions for OIDC token
@@ -675,7 +706,7 @@ These issues appear to be related to GitHub's API implementation, not with the m
 | `github_token` | GitHub token for API access | `string` | n/a | yes |
 | `github_owner` | GitHub organization or user name | `string` | `HafslundEcoVannkraft` | no |
 | `location` | Azure region for resources | `string` | n/a | yes |
-| `github_env_file` | Filename of GitHub environments configuration file | `string` | `"stratus-aca-github-environments.yaml"` | no |
+| `github_env_file` | Filename of GitHub environments configuration file | `string` | `"github-envrionments.yaml"` | no |
 | `state_storage_account_name` | Storage account for Terraform state | `string` | n/a | yes |
 
 ## Notes for Single Organization Support

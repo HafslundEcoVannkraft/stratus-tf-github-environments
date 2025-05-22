@@ -1,3 +1,8 @@
+# -----------------------------------------------------------------------------
+# variables.tf
+# Input variables for the stratus-tf-aca-gh-vending module.
+# Configure Azure, GitHub, and module-specific settings here.
+# -----------------------------------------------------------------------------
 variable "subscription_id" {
   description = "Azure Subscription ID used for resource deployment."
   type        = string
@@ -6,6 +11,7 @@ variable "subscription_id" {
 variable "location" {
   description = "Azure region for resource deployment (e.g., 'norwayeast')."
   type        = string
+  default     = "norwayeast"
 }
 
 variable "code_name" {
@@ -38,11 +44,11 @@ variable "github_owner" {
 variable "github_env_file" {
   description = "Filename of the GitHub environments configuration file. The workflow will search for this file recursively from the repository root."
   type        = string
-  default     = "stratus-aca-github-environments.yaml"
+  default     = "github-envrionments.yaml"
 }
 
 variable "is_stratus_tf_examples" {
   description = "Set to true if calling this module from the stratus-tf-examples repo."
   type        = bool
   default     = false
-} 
+}

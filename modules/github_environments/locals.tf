@@ -9,7 +9,7 @@ locals {
   env_suffix     = var.environment == "" ? local.workspace_name : var.environment
 
   # Path to the GitHub environment configuration file
-  github_env_file = coalesce(var.github_env_file, "${path.module}/stratus-aca-github-environments.yaml")
+  github_env_file = var.github_env_file
 
   # Extract repositories and environments from the YAML file
   yaml_content   = fileexists(local.github_env_file) ? file(local.github_env_file) : file("${path.module}/examples/minmal.yaml")

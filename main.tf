@@ -1,23 +1,16 @@
-# -----------------------------------------------------------------------------
-# main.tf
-# Core resources for the stratus-tf-aca-gh-vending module.
-# Handles validation, random naming, and resource group creation.
-# -----------------------------------------------------------------------------
+module "github_environments" {
+  source = "github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/modules/github_environments"
 
-# Fail if YAML validation doesn't pass
-resource "null_resource" "validation_check" {
-  count = local.valid_yaml ? 0 : "YAML validation failed - check your configuration"
-}
+  # Variables from tfvars file
+  subscription_id            = var.subscription_id
+  location                   = var.location
+  code_name                  = var.code_name
+  environment                = var.environment
+  state_storage_account_name = var.state_storage_account_name
 
-# Random string for unique resource naming
-resource "random_string" "name_suffix" {
-  length  = 4
-  special = false
-  upper   = false
-}
-
-# Create resource group for managed identities
-resource "azurerm_resource_group" "github_identities" {
-  name     = "${var.code_name}-rg-${var.environment}-github-identities-${random_string.name_suffix.result}"
-  location = var.location
-}
+  # Variables from workflow inputs
+  github_token           = var.github_token
+  github_owner           = var.github_owner
+  github_env_file        = "${path.module}/${var.github_env_file}"
+  is_stratus_tf_examples = var.is_stratus_tf_examples
+} 

@@ -17,10 +17,10 @@ on:
         type: string
         default: 'HafslundEcoVannkraft'
       github_env_file:
-        description: 'Filename of GitHub environment config (optional, defaults to stratus-aca-github-environments.yaml)'
+        description: 'Filename of GitHub environment config (optional, defaults to github-envrionments.yaml)'
         required: false
         type: string
-        default: 'stratus-aca-github-environments.yaml'
+        default: 'github-envrionments.yaml'
       is_stratus_tf_examples:
         description: 'Set to true if calling from stratus-tf-examples repo (optional, defaults to false)'
         required: false
@@ -34,134 +34,99 @@ on:
           - apply
           - destroy
         default: 'apply'
-      vending_module_ref:
-        description: 'Reference to the vending module (optional, defaults to main)'
-        required: false
-        type: string
-        default: 'main'
 
 permissions:
   id-token: write
   contents: read
 
-env:
-  DEPLOYMENT_DIR: terraform
-
 jobs:
-  # Prepare environment and deployment files
-  # Sets up the terraform files using templates from the specified vending module reference
   prepare:
     name: Prepare Deployment Files
     runs-on: ubuntu-latest
     outputs:
-      environment: ${{ steps.env_setup.outputs.environment }}
-      code_name: ${{ steps.env_setup.outputs.code_name }}
-      location: ${{ steps.env_setup.outputs.location }}
-      subscription_id: ${{ steps.env_setup.outputs.subscription_id }}
-      state_storage_account: ${{ steps.env_setup.outputs.state_storage_account }}
-      resource_group: ${{ steps.env_setup.outputs.resource_group }}
-      container_name: ${{ steps.env_setup.outputs.container_name }}
-    
+      environment: ${{ steps.copy_files.outputs.environment }}
+      code_name: ${{ steps.copy_files.outputs.code_name }}
+      location: ${{ steps.copy_files.outputs.location }}
+      subscription_id: ${{ steps.copy_files.outputs.subscription_id }}
+      resource_group: ${{ steps.copy_files.outputs.resource_group }}
+      tfvars_file: ${{ steps.copy_files.outputs.tfvars_file }}
     steps:
-      - name: Checkout repository
+      # Checkout the IaC repository (this repo)
+      - name: Checkout IaC repository
         uses: actions/checkout@v4.2.2
-      
-      - name: Setup environment and files
-        id: env_setup
-        run: |
-          # Create deployment directory
-          mkdir -p ${{ env.DEPLOYMENT_DIR }}
-          
-          # Log which vending module reference we're using
-          echo "Using vending module reference: ${{ github.event.inputs.vending_module_ref }}"
 
-          # Find the tfvars file recursively if only filename provided
+      # Checkout the public Terraform module repo into a subfolder
+      - name: Checkout public module
+        uses: actions/checkout@v4
+        with:
+          repository: HafslundEcoVannkraft/stratus-tf-aca-gh-vending
+          path: terraform-work
+
+      # Find and copy the tfvars and environment YAML file to terraform-work,
+      # and append required variables to the tfvars file.
+      - name: Find and copy tfvars and env file
+        id: copy_files
+        run: |
+          # Find the tfvars file (search recursively if only a filename is given)
           TFVARS_FILE="${{ github.event.inputs.tfvars_file }}"
           if [[ "$TFVARS_FILE" != *"/"* ]]; then
-            echo "Searching for tfvars file '$TFVARS_FILE' recursively..."
             FOUND_TFVARS=$(find . -name "$TFVARS_FILE" -type f | head -n 1)
-            
             if [ -n "$FOUND_TFVARS" ]; then
-              echo "Found tfvars file at: $FOUND_TFVARS"
               TFVARS_FILE="$FOUND_TFVARS"
             fi
           fi
-          
-          # Validate tfvars file exists
           if [ ! -f "$TFVARS_FILE" ]; then
             echo "Error: tfvars file not found at $TFVARS_FILE"
             exit 1
           fi
-          
-          # Extract variables
+
+          # Find the GitHub environment YAML file
+          ENV_FILE="${{ github.event.inputs.github_env_file }}"
+          FOUND_ENV=$(find . -name "$ENV_FILE" -type f | head -n 1)
+          if [ -z "$FOUND_ENV" ]; then
+            echo "Error: Could not find GitHub environment file '$ENV_FILE' in repository"
+            exit 1
+          fi
+
+          # Copy both files to terraform-work
+          cp "$TFVARS_FILE" terraform-work/
+          TFVARS_FILE="terraform-work/$(basename "$TFVARS_FILE")"
+          cp "$FOUND_ENV" terraform-work/
+          ENV_FILE="terraform-work/$(basename "$FOUND_ENV")"
+
+          # Extract variables for outputs
           SUBSCRIPTION_ID=$(grep 'subscription_id' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
           LOCATION=$(grep 'location' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
           CODE_NAME=$(grep 'code_name' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
           ENVIRONMENT=$(grep 'environment' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
           STATE_STORAGE_ACCOUNT=$(grep 'state_storage_account_name' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
           RESOURCE_GROUP=$(grep 'resource_group_name' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
-          
-          # Use default values if not found
           if [ -z "$RESOURCE_GROUP" ]; then
             RESOURCE_GROUP="${CODE_NAME}-rg-tf-state"
           fi
-          
-          CONTAINER_NAME="terraform-state"
-          
-          # Validate required variables
-          if [ -z "$SUBSCRIPTION_ID" ] || [ -z "$LOCATION" ] || [ -z "$CODE_NAME" ] || [ -z "$ENVIRONMENT" ] || [ -z "$STATE_STORAGE_ACCOUNT" ]; then
-            echo "Error: Missing required variables in tfvars file"
-            exit 1
-          fi
-          
-          # Download template files
-          curl -s https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/${{ github.event.inputs.vending_module_ref }}/workflow-templates/main.tf -o ${{ env.DEPLOYMENT_DIR }}/main.tf
-          curl -s https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/${{ github.event.inputs.vending_module_ref }}/workflow-templates/variables.tf -o ${{ env.DEPLOYMENT_DIR }}/variables.tf
-          
-          # Find GitHub environments file
-          ENV_FILE="${{ github.event.inputs.github_env_file }}"
-          FOUND_FILE=$(find . -name "$ENV_FILE" -type f | head -n 1)
-          
-          if [ -z "$FOUND_FILE" ]; then
-            echo "Error: Could not find GitHub environment file '$ENV_FILE' in repository"
-            exit 1
-          fi
-          
-          echo "Found GitHub environment file at: $FOUND_FILE"
-          cp "$FOUND_FILE" ${{ env.DEPLOYMENT_DIR }}/$(basename "$FOUND_FILE")
-          
-          # Create tfvars file for the deployment
-          cat > ${{ env.DEPLOYMENT_DIR }}/$ENVIRONMENT.tfvars << EOF
-          subscription_id            = "$SUBSCRIPTION_ID"
-          location                   = "$LOCATION"
-          code_name                  = "$CODE_NAME"
-          environment                = "$ENVIRONMENT"
-          state_storage_account_name = "$STATE_STORAGE_ACCOUNT"
-          github_token               = "${{ github.event.inputs.github_token }}"
-          github_owner               = "${{ github.event.inputs.github_owner }}"
-          github_env_file            = "$(basename $FOUND_FILE)"
-          is_stratus_tf_examples     = ${{ github.event.inputs.is_stratus_tf_examples }}
-          EOF
-          
-          # Set outputs for other jobs
+
+          # Append required variables to the tfvars file
+          {
+            echo "github_owner = \"${{ github.event.inputs.github_owner }}\""
+            echo "github_env_file = \"$(basename "$FOUND_ENV")\""
+            echo "is_stratus_tf_examples = ${{ github.event.inputs.is_stratus_tf_examples }}"
+          } >> "$TFVARS_FILE"
+
+          # Set outputs for downstream jobs
           echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
           echo "code_name=$CODE_NAME" >> $GITHUB_OUTPUT
           echo "location=$LOCATION" >> $GITHUB_OUTPUT
           echo "subscription_id=$SUBSCRIPTION_ID" >> $GITHUB_OUTPUT
-          echo "state_storage_account=$STATE_STORAGE_ACCOUNT" >> $GITHUB_OUTPUT
           echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
-          echo "container_name=$CONTAINER_NAME" >> $GITHUB_OUTPUT
-      
-      - name: Upload Deployment Directory
-        uses: actions/upload-artifact@v4.4.3
-        with:
-          name: deployment-files
-          path: ${{ env.DEPLOYMENT_DIR }}
-          if-no-files-found: error
-          retention-days: 1
+          echo "tfvars_file=$TFVARS_FILE" >> $GITHUB_OUTPUT
 
-  # Plan job using the reusable workflow
-  # Uses the prepared files from the specified vending module reference
+      # Cache the terraform-work directory for performance
+      - name: Cache terraform-work
+        uses: actions/cache@v4.2.3
+        with:
+          key: ${{ steps.copy_files.outputs.code_name }}-${{ steps.copy_files.outputs.environment }}
+          path: terraform-work
+
   plan:
     needs: prepare
     permissions:
@@ -169,21 +134,19 @@ jobs:
       contents: read
       pull-requests: write
       id-token: write
-    uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_plan.yaml@main
+    uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_plan.yaml@feat/cache
     name: ${{ needs.prepare.outputs.environment }} Plan
     with:
-      path: ${{ env.DEPLOYMENT_DIR }}
+      path: terraform-work
       tf_version: latest
       tf_key: ${{ needs.prepare.outputs.environment }}
-      tf_vars_file: ${{ needs.prepare.outputs.environment }}.tfvars
+      tf_vars_file: ${{ needs.prepare.outputs.tfvars_file }}
       gh_environment: ${{ needs.prepare.outputs.environment }}-plan
-      runner: ubuntu-latest
+      runner: stratus-github-hosted
       do-destroy: ${{ github.event.inputs.operation == 'destroy' }}
-      state_storage_account_id: "/subscriptions/${{ needs.prepare.outputs.subscription_id }}/resourceGroups/${{ needs.prepare.outputs.resource_group }}/providers/Microsoft.Storage/storageAccounts/${{ needs.prepare.outputs.state_storage_account }}"
-      state_container: ${{ needs.prepare.outputs.container_name }}
-  
-  # Apply job using the reusable workflow
-  # Uses the prepared files from the specified vending module reference
+      cache_key: ${{ needs.prepare.outputs.code_name }}-${{ needs.prepare.outputs.environment }}
+      cache_path: terraform-work
+
   apply:
     if: github.event.inputs.operation == 'apply'
     needs: [prepare, plan]
@@ -192,48 +155,14 @@ jobs:
       contents: read
       pull-requests: write
       id-token: write
-    uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_apply.yaml@main
+    uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_apply.yaml@feat/cache
     name: ${{ needs.prepare.outputs.environment }} Apply
     with:
-      path: ${{ env.DEPLOYMENT_DIR }}
+      path: terraform-work
       tf_version: latest
       tf_key: ${{ needs.prepare.outputs.environment }}
-      tf_vars_file: ${{ needs.prepare.outputs.environment }}.tfvars
+      tf_vars_file: ${{ needs.prepare.outputs.tfvars_file }}
       gh_environment: ${{ needs.prepare.outputs.environment }}-apply
-      runner: ubuntu-latest
-      state_storage_account_id: "/subscriptions/${{ needs.prepare.outputs.subscription_id }}/resourceGroups/${{ needs.prepare.outputs.resource_group }}/providers/Microsoft.Storage/storageAccounts/${{ needs.prepare.outputs.state_storage_account }}"
-      state_container: ${{ needs.prepare.outputs.container_name }}
-
-  # Destroy job using the reusable workflow
-  # Uses the prepared files from the specified vending module reference  
-  destroy:
-    if: github.event.inputs.operation == 'destroy'
-    needs: [prepare, plan]
-    permissions:
-      actions: read
-      contents: read
-      pull-requests: write
-      id-token: write
-    uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_destroy.yaml@main
-    name: ${{ needs.prepare.outputs.environment }} Destroy
-    with:
-      path: ${{ env.DEPLOYMENT_DIR }}
-      tf_version: latest
-      tf_key: ${{ needs.prepare.outputs.environment }}
-      tf_vars_file: ${{ needs.prepare.outputs.environment }}.tfvars
-      gh_environment: ${{ needs.prepare.outputs.environment }}-apply
-      runner: ubuntu-latest
-      state_storage_account_id: "/subscriptions/${{ needs.prepare.outputs.subscription_id }}/resourceGroups/${{ needs.prepare.outputs.resource_group }}/providers/Microsoft.Storage/storageAccounts/${{ needs.prepare.outputs.state_storage_account }}"
-      state_container: ${{ needs.prepare.outputs.container_name }}
-
-  # Cleanup job that runs after workflow completes
-  cleanup:
-    if: always()
-    needs: [prepare, plan, apply, destroy]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Delete artifact
-        uses: geekyeggo/delete-artifact@v4
-        with:
-          name: deployment-files
-          failOnError: false 
+      runner: stratus-github-hosted
+      cache_key: ${{ needs.prepare.outputs.code_name }}-${{ needs.prepare.outputs.environment }}
+      cache_path: terraform-work
