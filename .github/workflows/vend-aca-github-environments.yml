@@ -39,6 +39,9 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  TF_WORKSPACE: terraform-work # If you update this, you must also update path on hashFiles in cache step line 131
+
 jobs:
   prepare:
     name: Prepare Deployment Files
@@ -60,7 +63,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: HafslundEcoVannkraft/stratus-tf-aca-gh-vending
-          path: terraform-work
+          path: ${{ env.TF_WORKSPACE }}
 
       # Find and copy the tfvars and environment YAML file to terraform-work,
       # and append required variables to the tfvars file.
@@ -89,10 +92,10 @@ jobs:
           fi
 
           # Copy both files to terraform-work
-          cp "$TFVARS_FILE" terraform-work/
-          TFVARS_FILE="terraform-work/$(basename "$TFVARS_FILE")"
-          cp "$FOUND_ENV" terraform-work/
-          ENV_FILE="terraform-work/$(basename "$FOUND_ENV")"
+          cp "$TFVARS_FILE" ${{ env.TF_WORKSPACE }}/
+          TFVARS_FILE="${{ env.TF_WORKSPACE }}/$(basename "$TFVARS_FILE")"
+          cp "$FOUND_ENV" ${{ env.TF_WORKSPACE }}/
+          ENV_FILE="${{ env.TF_WORKSPACE }}/$(basename "$FOUND_ENV")"
 
           # Extract variables for outputs
           SUBSCRIPTION_ID=$(grep 'subscription_id' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
@@ -113,19 +116,19 @@ jobs:
           } >> "$TFVARS_FILE"
 
           # Set outputs for downstream jobs
-          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
-          echo "code_name=$CODE_NAME" >> $GITHUB_OUTPUT
-          echo "location=$LOCATION" >> $GITHUB_OUTPUT
-          echo "subscription_id=$SUBSCRIPTION_ID" >> $GITHUB_OUTPUT
-          echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
-          echo "tfvars_file=$TFVARS_FILE" >> $GITHUB_OUTPUT
+          echo "environment=$ENVIRONMENT" | tee -a "$GITHUB_OUTPUT" "$GITHUB_ENV"
+          echo "code_name=$CODE_NAME" | tee -a "$GITHUB_OUTPUT" "$GITHUB_ENV"
+          echo "location=$LOCATION" | tee -a "$GITHUB_OUTPUT"
+          echo "subscription_id=$SUBSCRIPTION_ID" | tee -a "$GITHUB_OUTPUT"
+          echo "resource_group=$RESOURCE_GROUP" | tee -a "$GITHUB_OUTPUT"
+          echo "tfvars_file=$(basename $TFVARS_FILE)" | tee -a "$GITHUB_OUTPUT"
 
       # Cache the terraform-work directory for performance
-      - name: Cache terraform-work
+      - name: Cache ${{ env.TF_WORKSPACE }}
         uses: actions/cache@v4.2.3
         with:
-          key: ${{ steps.copy_files.outputs.code_name }}-${{ steps.copy_files.outputs.environment }}
-          path: terraform-work
+          key: ${{ env.code_name }}-${{ env.environment }}-${{ hashFiles('terraform-work/**/*') }}
+          path: ${{ env.TF_WORKSPACE }}
 
   plan:
     needs: prepare
@@ -137,7 +140,7 @@ jobs:
     uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_plan.yaml@feat/cache
     name: ${{ needs.prepare.outputs.environment }} Plan
     with:
-      path: terraform-work
+      path: ${{ env.TF_WORKSPACE }}
       tf_version: latest
       tf_key: ${{ needs.prepare.outputs.environment }}
       tf_vars_file: ${{ needs.prepare.outputs.tfvars_file }}
@@ -145,7 +148,7 @@ jobs:
       runner: stratus-github-hosted
       do-destroy: ${{ github.event.inputs.operation == 'destroy' }}
       cache_key: ${{ needs.prepare.outputs.code_name }}-${{ needs.prepare.outputs.environment }}
-      cache_path: terraform-work
+      cache_path: ${{ env.TF_WORKSPACE }}
 
   apply:
     if: github.event.inputs.operation == 'apply'
@@ -158,11 +161,11 @@ jobs:
     uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_apply.yaml@feat/cache
     name: ${{ needs.prepare.outputs.environment }} Apply
     with:
-      path: terraform-work
+      path: ${{ env.TF_WORKSPACE }}
       tf_version: latest
       tf_key: ${{ needs.prepare.outputs.environment }}
       tf_vars_file: ${{ needs.prepare.outputs.tfvars_file }}
       gh_environment: ${{ needs.prepare.outputs.environment }}-apply
       runner: stratus-github-hosted
       cache_key: ${{ needs.prepare.outputs.code_name }}-${{ needs.prepare.outputs.environment }}
-      cache_path: terraform-work
+      cache_path: ${{ env.TF_WORKSPACE }}
