@@ -158,7 +158,7 @@ jobs:
     with:
       path: ${{ needs.prepare.outputs.tf_workspace }}
       tf_version: latest
-      tf_key: ${{ needs.prepare.outputs.environment }}
+      tf_key: github_environments_${{ needs.prepare.outputs.environment }}
       tf_vars_file: ${{ needs.prepare.outputs.tfvars_file }}
       gh_environment: ${{ needs.prepare.outputs.environment }}-plan
       runner: stratus-github-hosted
@@ -180,7 +180,7 @@ jobs:
     with:
       path: ${{ needs.prepare.outputs.tf_workspace }}
       tf_version: latest
-      tf_key: ${{ needs.prepare.outputs.environment }}
+      tf_key: github_environments_${{ needs.prepare.outputs.environment }}
       tf_vars_file: ${{ needs.prepare.outputs.tfvars_file }}
       gh_environment: ${{ needs.prepare.outputs.environment }}-apply
       runner: stratus-github-hosted
