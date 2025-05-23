@@ -126,7 +126,7 @@ jobs:
           echo "resource_group=$RESOURCE_GROUP" | tee -a "$GITHUB_OUTPUT"
           echo "tfvars_file=$(basename $TFVARS_FILE)" | tee -a "$GITHUB_OUTPUT"
           echo "tf_workspace=$TF_WORKSPACE" | tee -a "$GITHUB_OUTPUT"
-      
+
       # We only need terrform for formatting, not for plan or apply
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3.1.2
@@ -144,7 +144,7 @@ jobs:
           # sha1sum is used to create a unique cache key for the ${{ env.TF_WORKSPACE }} directory
           hash_files=$(find . -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum | cut -d' ' -f1)
           echo "cache_key=$code_name-$environment-$hash_files" | tee -a "$GITHUB_OUTPUT" "$GITHUB_ENV"
-          
+
       # Cache the ${{ env.TF_WORKSPACE }} directory as we need it for both plan and apply
       - name: Cache ${{ env.TF_WORKSPACE }}
         uses: actions/cache@v4.2.3
@@ -171,6 +171,7 @@ jobs:
       do-destroy: ${{ github.event.inputs.operation == 'destroy' }}
       cache_key: ${{ needs.prepare.outputs.cache_key }}
       cache_path: ${{ needs.prepare.outputs.tf_workspace }}
+      github_token: ${{ github.event.inputs.github_token }}
 
   apply:
     if: github.event.inputs.operation == 'apply'
@@ -191,3 +192,4 @@ jobs:
       runner: stratus-github-hosted
       cache_key: ${{ needs.prepare.outputs.cache_key }}
       cache_path: ${{ needs.prepare.outputs.tf_workspace }}
+      github_token: ${{ github.event.inputs.github_token }}
