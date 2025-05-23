@@ -45,7 +45,7 @@ output "github_environments" {
 output "environment_variables_summary" {
   description = "Summary of automatic Azure variables provided to each environment."
   value = {
-    automatic_variables_count = 9 # 7 standard Azure variables + 2 per-environment variables
+    automatic_variables_count = 11 # 9 standard Azure variables + 2 per-environment variables
     automatic_variables_provided = [
       "AZURE_CLIENT_ID (unique per environment)",
       "AZURE_TENANT_ID",
@@ -53,6 +53,8 @@ output "environment_variables_summary" {
       "ACR_NAME",
       "CONTAINER_APP_ENVIRONMENT_ID",
       "CONTAINER_APP_ENVIRONMENT_CLIENT_ID (unique per environment)",
+      "PRIVATE_DNS_ZONE_NAME",
+      "PUBLIC_DNS_ZONE_NAME",
       "BACKEND_AZURE_RESOURCE_GROUP_NAME",
       "BACKEND_AZURE_STORAGE_ACCOUNT_NAME",
       "BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME"
@@ -86,6 +88,21 @@ output "azure_infrastructure" {
     container_registry = {
       name = local.acr_name
     }
+    ace_storage_account = local.ace_storage_account_id != "" ? {
+      id   = local.ace_storage_account_id
+      name = local.ace_storage_account_name
+      note = "Used for persistent storage, file shares, and Dapr components"
+    } : null
+    private_dns_zone = local.private_dns_zone_id != "" ? {
+      id   = local.private_dns_zone_id
+      name = local.private_dns_zone_name
+      note = "Used for creating CNAME records for container apps"
+    } : null
+    public_dns_zone = local.public_dns_zone_id != "" ? {
+      id   = local.public_dns_zone_id
+      name = local.public_dns_zone_name
+      note = "Used for creating DNS records for internet-accessible container apps via Application Gateway"
+    } : null
     terraform_backend = {
       resource_group_name  = local.terraform_backend.resource_group_name
       storage_account_name = local.terraform_backend.storage_account_name
@@ -125,6 +142,8 @@ output "next_steps" {
         "$${{ vars.ACR_NAME }}",
         "$${{ vars.CONTAINER_APP_ENVIRONMENT_ID }}",
         "$${{ vars.CONTAINER_APP_ENVIRONMENT_CLIENT_ID }}",
+        "$${{ vars.PRIVATE_DNS_ZONE_NAME }}",
+        "$${{ vars.PUBLIC_DNS_ZONE_NAME }}",
         "$${{ vars.BACKEND_AZURE_RESOURCE_GROUP_NAME }}",
         "$${{ vars.BACKEND_AZURE_STORAGE_ACCOUNT_NAME }}",
         "$${{ vars.BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME }}"
@@ -153,16 +172,37 @@ output "troubleshooting_info" {
     module_version        = "Latest"
     terraform_workspace   = terraform.workspace
     github_api_calls_made = "GitHub environments, variables, secrets, and policies configured"
-    azure_role_assignments = [
-      "AcrPush on ${local.acr_name}",
-      "Container Apps Contributor on Container App Environment",
-      "Container Apps Jobs Contributor on Container App Environment",
-      "Storage Blob Data Contributor on Terraform state storage"
-    ]
+    azure_role_assignments = {
+      plan_environments = [
+        "Reader on Container App Environment (read-only access)",
+        "Storage Blob Data Reader on Terraform state storage (read-only)"
+      ]
+      apply_environments = concat([
+        "AcrPush on ${local.acr_name}",
+        "Container Apps Contributor on Container App Environment",
+        "Container Apps Jobs Contributor on Container App Environment",
+        "Reader on Container App Environment",
+        "Storage Blob Data Contributor on Terraform state storage (read/write)"
+        ], local.ace_storage_account_id != "" ? [
+        "Storage Blob Data Contributor on ACE storage account (${local.ace_storage_account_name})",
+        "Storage File Data SMB Share Contributor on ACE storage account (${local.ace_storage_account_name})",
+        "Storage Queue Data Contributor on ACE storage account (${local.ace_storage_account_name})",
+        "Storage Table Data Contributor on ACE storage account (${local.ace_storage_account_name})"
+        ] : [], local.private_dns_zone_id != "" ? [
+        "DNS Zone Contributor on private DNS zone (${local.private_dns_zone_name})"
+        ] : [], local.public_dns_zone_id != "" ? [
+        "DNS Zone Contributor on public DNS zone (${local.public_dns_zone_name})"
+      ] : [])
+      security_note = "Plan environments (ending with '-plan') get read-only permissions, apply environments get full deployment permissions including ACE storage access and DNS management"
+    }
     common_issues = {
       github_token_permissions = "Ensure token has repo, workflow, read:org scopes"
       azure_permissions        = "Ensure Azure identity has Contributor access to subscription"
       network_access           = "Module requires access to private Terraform backend storage"
+      plan_permissions         = "Plan environments have read-only access - use apply environments for deployments"
+      ace_storage_access       = local.ace_storage_account_id != "" ? "ACE storage account permissions automatically granted to apply environments" : "No ACE storage account detected - storage permissions not assigned"
+      dns_zone_access          = local.private_dns_zone_id != "" ? "DNS zone permissions automatically granted to apply environments for CNAME record creation" : "No private DNS zone detected - DNS permissions not assigned"
+      public_dns_zone_access   = local.public_dns_zone_id != "" ? "Public DNS zone permissions automatically granted to apply environments for internet-accessible apps" : "No public DNS zone detected - public DNS permissions not assigned"
     }
   }
 }

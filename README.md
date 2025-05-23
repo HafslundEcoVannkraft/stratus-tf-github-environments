@@ -1,6 +1,6 @@
 # GitHub Environment Vending for Azure Container Apps
 
-> **Note:** This module is specifically tailored for developer teams building on the Stratus Corp Azure Landing Zone with Container App Environment. It is optimized for greenfield infrastructure-as-code (IaC) repositories created for each new system or team starting their journey in Stratus. Some input variables and design choices are opinionated for this workflow. **This module may not be the optimal choice for other use cases or non-Stratus environments.**
+> **Note:** This module is specifically tailored for developer teams building on the Stratus Corp Azure Landing Zone with Container App Environment. It is optimized for the IaC Repositories created for each new system or team starting their journey in Stratus. Some input variables and design choices are opinionated for this workflow. **This module may not be the optimal choice for other use cases or non-Stratus environments.**
 
 ---
 
@@ -499,6 +499,8 @@ The module automatically provides essential Azure infrastructure variables for a
 | `ACR_NAME` | Container registry name | Remote state from infrastructure deployment |
 | `CONTAINER_APP_ENVIRONMENT_ID` | Target environment for deployments | Remote state from infrastructure deployment |
 | `CONTAINER_APP_ENVIRONMENT_CLIENT_ID` | Client ID for ACR authentication | Per-environment managed identity |
+| `PRIVATE_DNS_ZONE_NAME` | Private DNS zone name for creating CNAME records | Remote state from infrastructure deployment |
+| `PUBLIC_DNS_ZONE_NAME` | Public DNS zone name for creating DNS records for internet-accessible apps | Remote state from infrastructure deployment |
 | `BACKEND_AZURE_RESOURCE_GROUP_NAME` | Resource group for Terraform state | Module configuration |
 | `BACKEND_AZURE_STORAGE_ACCOUNT_NAME` | Storage account for Terraform state | Module configuration |
 | `BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME` | Container for state files | Module configuration |
@@ -545,11 +547,32 @@ For each environment, the following Azure resources are created:
    - Subject format: `repo:{owner}/{repo}:environment:{environment}`
    - Enables passwordless authentication from GitHub to Azure
 
-3. **Role Assignments**:
+3. **Role Assignments** (implements least-privilege access):
+
+   **Plan Environments** (environments ending with `-plan`):
+   - **Reader**: Read-only access to Container App Environment for planning
+   - **Storage Blob Data Reader**: Read-only access to Terraform state for planning
+
+   **Apply Environments** (all other environments):
    - **AcrPush**: Allows pushing container images to Azure Container Registry
    - **Container Apps Contributor**: Allows deploying to Azure Container Apps
    - **Container Apps Jobs Contributor**: Allows deploying jobs to Container Apps
-   - **Storage Blob Data Contributor**: Provides access to Terraform state for CI/CD
+   - **Reader**: Read access to Container App Environment
+   - **Storage Blob Data Contributor**: Read/write access to Terraform state for CI/CD
+   
+   **ACE Storage Account** (if available, apply environments only):
+   - **Storage Blob Data Contributor**: Access to blob storage for application data
+   - **Storage File Data SMB Share Contributor**: Access to file shares for persistent storage
+   - **Storage Queue Data Contributor**: Access to storage queues for Dapr components
+   - **Storage Table Data Contributor**: Access to storage tables for Dapr components
+
+   **Private DNS Zone** (if available, apply environments only):
+   - **DNS Zone Contributor**: Allows creating CNAME records for container apps with custom domains
+
+   **Public DNS Zone** (if available, apply environments only):
+   - **DNS Zone Contributor**: Allows creating DNS records for internet-accessible container apps via Application Gateway
+
+> **Security Note**: Plan environments receive read-only permissions to support Terraform planning operations without allowing actual deployments or state modifications. Apply environments receive full deployment permissions including automatic access to ACE storage for persistent storage, file shares, and Dapr components when available, plus DNS zone access for automated DNS record creation (both private and public zones). This separation follows the principle of least privilege.
 
 ## GitHub Action Integration
 
@@ -565,6 +588,8 @@ Once this module has been applied, your GitHub workflows can use the automatical
 | `ACR_NAME` | Container registry name | Image operations |
 | `CONTAINER_APP_ENVIRONMENT_ID` | Target environment for deployments | Container app deployments |
 | `CONTAINER_APP_ENVIRONMENT_CLIENT_ID` | Client ID of the managed identity for ACR authentication | ACR operations |
+| `PRIVATE_DNS_ZONE_NAME` | Private DNS zone name for creating CNAME records | DNS record creation |
+| `PUBLIC_DNS_ZONE_NAME` | Public DNS zone name for creating DNS records for internet-accessible apps | Public DNS record creation |
 | `BACKEND_AZURE_RESOURCE_GROUP_NAME` | Resource group for Terraform state | CI/CD state access |
 | `BACKEND_AZURE_STORAGE_ACCOUNT_NAME` | Storage account for Terraform state | CI/CD state access |
 | `BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME` | Container for state files | CI/CD state access |
@@ -621,6 +646,32 @@ jobs:
             --name my-container-app \
             --resource-group my-resource-group \
             --image ${{ vars.ACR_NAME }}.azurecr.io/myapp:${{ github.sha }}
+
+      - name: Create DNS CNAME record for custom domain
+        run: |
+          # Get the container app's FQDN
+          APP_FQDN=$(az containerapp show \
+            --name my-container-app \
+            --resource-group my-resource-group \
+            --query 'properties.configuration.ingress.fqdn' \
+            --output tsv)
+          
+          # Create CNAME record pointing to the container app
+          az network dns record-set cname set-record \
+            --zone-name ${{ vars.PRIVATE_DNS_ZONE_NAME }} \
+            --resource-group my-resource-group \
+            --record-set-name myapp \
+            --cname $APP_FQDN
+
+      - name: Create public DNS record for internet access (optional)
+        run: |
+          # Create A record for internet-accessible app via Application Gateway
+          # Replace with your Application Gateway's public IP
+          az network dns record-set a add-record \
+            --zone-name ${{ vars.PUBLIC_DNS_ZONE_NAME }} \
+            --resource-group my-resource-group \
+            --record-set-name myapp \
+            --ipv4-address 20.1.2.3
 ```
 
 For more advanced deployment patterns, you may want to:

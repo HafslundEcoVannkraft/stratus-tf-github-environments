@@ -48,6 +48,20 @@ locals {
   # Full ARM resource path needed for role assignment scope
   acr_resource_id = try(local.remote_state_outputs.acr_resource_id, "")
 
+  # Azure Container App Environment Storage Account for persistent storage
+  # Used by container apps for file shares, Dapr components, and application data
+  ace_storage_account_id   = try(local.remote_state_outputs.ace_storage_account_id, "")
+  ace_storage_account_name = try(local.remote_state_outputs.ace_storage_account_name, "")
+
+  # Private DNS Zone for creating CNAME records for container apps
+  # Enables custom domain names and automated DNS record creation during deployments
+  private_dns_zone_id   = try(local.remote_state_outputs.private_dns_zone_id, "")
+  private_dns_zone_name = try(local.remote_state_outputs.private_dns_zone_name, "")
+
+  # Public DNS Zone for creating DNS records for internet-accessible container apps
+  # Used with Application Gateway for public-facing applications
+  public_dns_zone_id   = try(local.remote_state_outputs.public_dns_zone_id, "")
+  public_dns_zone_name = try(local.remote_state_outputs.public_dns_zone_name, "")
 
   # =============================================================================
   # ENVIRONMENT PROCESSING AND FLATTENING
@@ -174,6 +188,7 @@ locals {
   # - Access Azure Container Registry for image operations  
   # - Deploy to Azure Container App Environment
   # - Access Terraform state for CI/CD operations
+  # - Create DNS records for custom domains
   standard_azure_variables = {
     # Azure authentication and subscription details
     AZURE_TENANT_ID       = data.azurerm_client_config.current.tenant_id
@@ -184,6 +199,12 @@ locals {
 
     # Azure Container App Environment for deployments
     CONTAINER_APP_ENVIRONMENT_ID = local.container_app_environment_id
+
+    # Private DNS Zone for custom domain DNS records
+    PRIVATE_DNS_ZONE_NAME = local.private_dns_zone_name
+
+    # Public DNS Zone for internet-accessible DNS records (via Application Gateway)
+    PUBLIC_DNS_ZONE_NAME = local.public_dns_zone_name
 
     # Terraform backend configuration for CI/CD state access
     BACKEND_AZURE_RESOURCE_GROUP_NAME            = local.terraform_backend.resource_group_name
