@@ -485,12 +485,36 @@ This module works around these limitations as much as possible, but some combina
 
 ### Environment Variables and Secrets
 
-You can define both variables and secrets for each environment:
+The module automatically provides essential Azure infrastructure variables for all environments, plus you can define additional custom variables and secrets:
+
+#### Automatically Provided Azure Variables
+
+**The module automatically injects these variables into every GitHub environment** (no manual configuration required):
+
+| Variable Name | Description | Source |
+|---------------|-------------|---------|
+| `AZURE_CLIENT_ID` | Managed identity client ID (unique per environment) | Per-environment managed identity |
+| `AZURE_TENANT_ID` | Azure tenant ID | Current Azure client config |
+| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID | Current Azure client config |
+| `ACR_NAME` | Container registry name | Remote state from infrastructure deployment |
+| `CONTAINER_APP_ENVIRONMENT_ID` | Target environment for deployments | Remote state from infrastructure deployment |
+| `CONTAINER_APP_ENVIRONMENT_CLIENT_ID` | Client ID for ACR authentication | Per-environment managed identity |
+| `BACKEND_AZURE_RESOURCE_GROUP_NAME` | Resource group for Terraform state | Module configuration |
+| `BACKEND_AZURE_STORAGE_ACCOUNT_NAME` | Storage account for Terraform state | Module configuration |
+| `BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME` | Container for state files | Module configuration |
+
+> **Key Benefits**: These variables provide everything needed for Azure OIDC authentication, container operations, and CI/CD state access without any manual configuration.
+
+#### Custom Variables and Secrets (Optional)
+
+You can define additional custom variables and secrets for each environment in your YAML configuration:
 
 ```yaml
 variables:
   API_URL: "https://api.example.com"
   DEBUG_MODE: "false"
+  # Custom variables are merged with automatic Azure variables
+  # Custom variables take precedence if names conflict
 
 secrets:
   - name: API_KEY
@@ -499,9 +523,11 @@ secrets:
     value: "another-secret-value"
 ```
 
+**Variable Precedence**: Custom variables override automatic Azure variables if there are naming conflicts.
+
 **Note**: This version of the module only supports static secrets defined directly in the YAML file. 
 
-> **Important**: Container App deployments using Azure OIDC federation typically don't need GitHub Environment secrets for Azure authentication. If you need environment secrets for build steps or third-party services, consider creating them manually in GitHub until a future version supports dynamic secret substitution during runtime.
+> **Important**: Container App deployments using Azure OIDC federation typically don't need GitHub Environment secrets for Azure authentication since all Azure variables are automatically provided. Use secrets for build steps or third-party services only.
 
 Future versions will support secret substitution from GitHub workflow environment variables, GitHub secrets, and references to Azure Key Vault for even greater security and flexibility in production environments.
 
@@ -529,16 +555,21 @@ For each environment, the following Azure resources are created:
 
 Once this module has been applied, your GitHub workflows can use the automatically configured environments and federated credentials to deploy to Azure Container Apps.
 
-The module sets up these environment variables for use in GitHub Actions:
-- `AZURE_CLIENT_ID` - The managed identity client ID for GitHub OIDC federation
-- `AZURE_TENANT_ID` - The Azure tenant ID
-- `AZURE_SUBSCRIPTION_ID` - The Azure subscription ID
-- `ACR_NAME` - Container registry name
-- `CONTAINER_APP_ENVIRONMENT_ID` - Target environment for deployments
-- `CONTAINER_APP_ENVIRONMENT_CLIENT_ID` - Client ID of the managed identity for ACR authentication
-- `BACKEND_AZURE_RESOURCE_GROUP_NAME` - Resource group for Terraform state
-- `BACKEND_AZURE_STORAGE_ACCOUNT_NAME` - Storage account for Terraform state
-- `BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME` - Container for state files
+**The module automatically configures these environment variables** for use in GitHub Actions (no manual setup required):
+
+| Variable | Description | Usage |
+|----------|-------------|-------|
+| `AZURE_CLIENT_ID` | The managed identity client ID for GitHub OIDC federation | Azure authentication |
+| `AZURE_TENANT_ID` | The Azure tenant ID | Azure authentication |
+| `AZURE_SUBSCRIPTION_ID` | The Azure subscription ID | Azure authentication |
+| `ACR_NAME` | Container registry name | Image operations |
+| `CONTAINER_APP_ENVIRONMENT_ID` | Target environment for deployments | Container app deployments |
+| `CONTAINER_APP_ENVIRONMENT_CLIENT_ID` | Client ID of the managed identity for ACR authentication | ACR operations |
+| `BACKEND_AZURE_RESOURCE_GROUP_NAME` | Resource group for Terraform state | CI/CD state access |
+| `BACKEND_AZURE_STORAGE_ACCOUNT_NAME` | Storage account for Terraform state | CI/CD state access |
+| `BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME` | Container for state files | CI/CD state access |
+
+> **Ready to Use**: These variables are automatically available in your GitHub Actions workflows immediately after running this module. No additional configuration needed!
 
 ### Example Workflow for Container App Deployment
 
@@ -865,5 +896,3 @@ jobs:
         run: |
           # Deployment steps here
 ```
-
-This pattern allows you to separate planning from execution, with appropriate protection rules for each stage.

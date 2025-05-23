@@ -20,3 +20,39 @@ data "terraform_remote_state" "container_app_environment" {
 
 # Get current Azure client configuration (for role assignments, etc.)
 data "azurerm_client_config" "current" {}
+
+# Look up team IDs for teams referenced by name or slug
+data "github_team" "environment_teams" {
+  for_each = toset(flatten([
+    for repo in local.repositories : [
+      for env in repo.environments : [
+        for team in try(env.reviewers.teams, []) :
+        team.name != null ? team.name : team.slug
+      ]
+    ]
+  ]))
+
+  slug = each.key
+}
+
+# Look up user IDs for users referenced by username
+data "github_user" "environment_users" {
+  for_each = toset(flatten([
+    for repo in local.repositories : [
+      for env in repo.environments : [
+        for user in try(env.reviewers.users, []) : user.username
+      ]
+    ]
+  ]))
+
+  username = each.key
+}
+
+# Look up existing environments to handle imports
+data "github_repository_environments" "existing" {
+  for_each = toset([
+    for env in local.environments : env.repository
+  ])
+
+  repository = each.key
+}

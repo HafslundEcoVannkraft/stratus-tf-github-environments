@@ -1,11 +1,11 @@
 # -----------------------------------------------------------------------------
-# roles.tf
+# azure_roles.tf
 # Azure role assignments for managed identities used by GitHub environments.
 # -----------------------------------------------------------------------------
 
 # Assign AcrPush role to managed identities for all GitHub environments
 resource "azurerm_role_assignment" "github_federated_credentials_acrpush" {
-  for_each = local.container_app_environment_id != "" && local.acr_name != "" ? { for item in local.flattened_repo_environments : item.full_key => item } : {}
+  for_each = local.container_app_environment_id != "" && local.acr_name != "" ? { for item in local.flattened_repo_environments : item.key => item } : {}
 
   scope                = local.acr_resource_id
   role_definition_name = "AcrPush"
@@ -15,7 +15,7 @@ resource "azurerm_role_assignment" "github_federated_credentials_acrpush" {
 
 # Assign Container Apps Contributor role to managed identities for all environments
 resource "azurerm_role_assignment" "github_federated_credentials_container_apps_contributor" {
-  for_each = local.container_app_environment_id != "" ? { for item in local.flattened_repo_environments : item.full_key => item } : {}
+  for_each = local.container_app_environment_id != "" ? { for item in local.flattened_repo_environments : item.key => item } : {}
 
   scope                = local.container_app_environment_id
   role_definition_name = "Container Apps Contributor"
@@ -25,7 +25,7 @@ resource "azurerm_role_assignment" "github_federated_credentials_container_apps_
 
 # Assign Container Apps Jobs Contributor role to managed identities for all environments
 resource "azurerm_role_assignment" "github_federated_credentials_container_apps_jobs_contributor" {
-  for_each = local.container_app_environment_id != "" ? { for item in local.flattened_repo_environments : item.full_key => item } : {}
+  for_each = local.container_app_environment_id != "" ? { for item in local.flattened_repo_environments : item.key => item } : {}
 
   scope                = local.container_app_environment_id
   role_definition_name = "Container Apps Jobs Contributor"
@@ -35,7 +35,7 @@ resource "azurerm_role_assignment" "github_federated_credentials_container_apps_
 
 # Assign Storage Blob Data Contributor role to managed identities for all environments
 resource "azurerm_role_assignment" "github_federated_credentials_storage_blob_data_contributor" {
-  for_each = length(local.terraform_backend.resource_group_name) > 0 && length(local.terraform_backend.storage_account_name) > 0 ? { for item in local.flattened_repo_environments : item.full_key => item } : {}
+  for_each = length(local.terraform_backend.resource_group_name) > 0 && length(local.terraform_backend.storage_account_name) > 0 ? { for item in local.flattened_repo_environments : item.key => item } : {}
 
   # Use the storage account for Terraform state
   scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/${local.terraform_backend.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${local.terraform_backend.storage_account_name}"
