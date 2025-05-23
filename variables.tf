@@ -32,6 +32,7 @@ variable "state_storage_account_name" {
 variable "github_token" {
   description = "GitHub token with permissions to create and manage environments and secrets."
   type        = string
+  ephemeral   = true
   sensitive   = true
 }
 
@@ -50,5 +51,6 @@ variable "github_env_file" {
 variable "is_stratus_tf_examples" {
   description = "Set to true if calling this module from the stratus-tf-examples repo."
   type        = bool
+  ephemeral   = true
   default     = false
 }
