@@ -39,13 +39,12 @@ permissions:
   id-token: write
   contents: read
 
-env:
-  TF_WORKSPACE: terraform-work # If you update this, you must also update path on hashFiles in cache step line 131
-
 jobs:
   prepare:
     name: Prepare Deployment Files
     runs-on: ubuntu-latest
+    env:
+      TF_WORKSPACE: terraform-work
     outputs:
       environment: ${{ steps.copy_files.outputs.environment }}
       code_name: ${{ steps.copy_files.outputs.code_name }}
@@ -53,6 +52,8 @@ jobs:
       subscription_id: ${{ steps.copy_files.outputs.subscription_id }}
       resource_group: ${{ steps.copy_files.outputs.resource_group }}
       tfvars_file: ${{ steps.copy_files.outputs.tfvars_file }}
+      cache_key: ${{ steps.create_cache_key.outputs.cache_key }}
+      tf_workspace: ${{ steps.copy_files.outputs.tf_workspace }}
     steps:
       # Checkout the IaC repository (this repo)
       - name: Checkout IaC repository
@@ -65,7 +66,7 @@ jobs:
           repository: HafslundEcoVannkraft/stratus-tf-aca-gh-vending
           path: ${{ env.TF_WORKSPACE }}
 
-      # Find and copy the tfvars and environment YAML file to terraform-work,
+      # Find and copy the tfvars and environment YAML file to ${{ env.TF_WORKSPACE }}
       # and append required variables to the tfvars file.
       - name: Find and copy tfvars and env file
         id: copy_files
@@ -91,7 +92,7 @@ jobs:
             exit 1
           fi
 
-          # Copy both files to terraform-work
+          # Copy both files to ${{ env.TF_WORKSPACE }}
           cp "$TFVARS_FILE" ${{ env.TF_WORKSPACE }}/
           TFVARS_FILE="${{ env.TF_WORKSPACE }}/$(basename "$TFVARS_FILE")"
           cp "$FOUND_ENV" ${{ env.TF_WORKSPACE }}/
@@ -108,7 +109,9 @@ jobs:
             RESOURCE_GROUP="${CODE_NAME}-rg-tf-state"
           fi
 
-          # Append required variables to the tfvars file
+          # Ensure the file ends with a newline before appending
+          tail -c1 "$TFVARS_FILE" | read -r _ || echo >> "$TFVARS_FILE"
+
           {
             echo "github_owner = \"${{ github.event.inputs.github_owner }}\""
             echo "github_env_file = \"$(basename "$FOUND_ENV")\""
@@ -122,12 +125,31 @@ jobs:
           echo "subscription_id=$SUBSCRIPTION_ID" | tee -a "$GITHUB_OUTPUT"
           echo "resource_group=$RESOURCE_GROUP" | tee -a "$GITHUB_OUTPUT"
           echo "tfvars_file=$(basename $TFVARS_FILE)" | tee -a "$GITHUB_OUTPUT"
+          echo "tf_workspace=$TF_WORKSPACE" | tee -a "$GITHUB_OUTPUT"
+      
+      # We only need terrform for formatting, not for plan or apply
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3.1.2
 
-      # Cache the terraform-work directory for performance
+      - name: Terraform Format
+        id: fmt
+        working-directory: ${{ env.TF_WORKSPACE }}
+        run: terraform fmt --recursive
+        continue-on-error: false
+
+      - name: Create the cache key
+        id: create_cache_key
+        working-directory: ${{ env.TF_WORKSPACE }}
+        run: |
+          # sha1sum is used to create a unique cache key for the ${{ env.TF_WORKSPACE }} directory
+          hash_files=$(find . -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum | cut -d' ' -f1)
+          echo "cache_key=$code_name-$environment-$hash_files" | tee -a "$GITHUB_OUTPUT" "$GITHUB_ENV"
+          
+      # Cache the ${{ env.TF_WORKSPACE }} directory as we need it for both plan and apply
       - name: Cache ${{ env.TF_WORKSPACE }}
         uses: actions/cache@v4.2.3
         with:
-          key: ${{ env.code_name }}-${{ env.environment }}-${{ hashFiles('terraform-work/**/*') }}
+          key: ${{ steps.create_cache_key.outputs.cache_key }}
           path: ${{ env.TF_WORKSPACE }}
 
   plan:
@@ -140,15 +162,15 @@ jobs:
     uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_plan.yaml@feat/cache
     name: ${{ needs.prepare.outputs.environment }} Plan
     with:
-      path: ${{ env.TF_WORKSPACE }}
+      path: ${{ needs.prepare.outputs.tf_workspace }}
       tf_version: latest
       tf_key: ${{ needs.prepare.outputs.environment }}
       tf_vars_file: ${{ needs.prepare.outputs.tfvars_file }}
       gh_environment: ${{ needs.prepare.outputs.environment }}-plan
       runner: stratus-github-hosted
       do-destroy: ${{ github.event.inputs.operation == 'destroy' }}
-      cache_key: ${{ needs.prepare.outputs.code_name }}-${{ needs.prepare.outputs.environment }}
-      cache_path: ${{ env.TF_WORKSPACE }}
+      cache_key: ${{ needs.prepare.outputs.cache_key }}
+      cache_path: ${{ needs.prepare.outputs.tf_workspace }}
 
   apply:
     if: github.event.inputs.operation == 'apply'
@@ -161,11 +183,11 @@ jobs:
     uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_apply.yaml@feat/cache
     name: ${{ needs.prepare.outputs.environment }} Apply
     with:
-      path: ${{ env.TF_WORKSPACE }}
+      path: ${{ needs.prepare.outputs.tf_workspace }}
       tf_version: latest
       tf_key: ${{ needs.prepare.outputs.environment }}
       tf_vars_file: ${{ needs.prepare.outputs.tfvars_file }}
       gh_environment: ${{ needs.prepare.outputs.environment }}-apply
       runner: stratus-github-hosted
-      cache_key: ${{ needs.prepare.outputs.code_name }}-${{ needs.prepare.outputs.environment }}
-      cache_path: ${{ env.TF_WORKSPACE }}
+      cache_key: ${{ needs.prepare.outputs.cache_key }}
+      cache_path: ${{ needs.prepare.outputs.tf_workspace }}
