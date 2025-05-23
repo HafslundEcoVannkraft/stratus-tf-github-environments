@@ -33,80 +33,120 @@ data "github_user" "environment_users" {
 
 # Process each environment for better organization
 locals {
-  # Create a flattened list of all environments with their properties
+  # =============================================================================
+  # ENVIRONMENT PROCESSING AND ORGANIZATION
+  # =============================================================================
+
+  # Create a flattened list of all environments with their complete properties
+  # This processes the YAML configuration into a standardized format for resource creation
+  # Each environment gets extracted from the nested repo -> environments structure
+  # into a flat list with all necessary configuration properties
   environments = flatten([
     for repo in local.repositories : [
       for env in repo.environments : {
-        repository      = repo.repo
-        environment     = env.name
-        key             = "${repo.repo}-${env.name}"
-        full_key        = "${repo.repo}-${env.name}"
-        prevent_destroy = try(env.prevent_destroy, false)
+        repository      = repo.repo                              # GitHub repository name
+        environment     = env.name                               # Environment name (dev, staging, prod, etc.)
+        key             = "${repo.repo}-${env.name}"            # Dash-separated key for resource naming
+        full_key        = "${repo.repo}-${env.name}"            # Same as key (kept for backward compatibility)
+        prevent_destroy = try(env.prevent_destroy, false)       # Lifecycle protection setting
+        
+        # Reviewer configuration for deployment approvals
         reviewers = {
-          users = try(env.reviewers.users, [])
-          teams = try(env.reviewers.teams, [])
+          users = try(env.reviewers.users, [])                  # GitHub users who can approve deployments
+          teams = try(env.reviewers.teams, [])                  # GitHub teams who can approve deployments
         }
-        branch_policy = try(env.deployment_branch_policy, null)
-        tag_policy    = try(env.deployment_tag_policy, null)
-        variables     = try(env.variables, {})
-        secrets       = try(env.secrets, [])
+        
+        # Branch and tag deployment policies
+        branch_policy = try(env.deployment_branch_policy, null) # Which branches can deploy
+        tag_policy    = try(env.deployment_tag_policy, null)    # Which tags can deploy
+        
+        # Environment-specific configuration
+        variables = try(env.variables, {})                       # Environment variables to set
+        secrets   = try(env.secrets, [])                        # Secrets to create
       }
     ]
   ])
 
-  # Map environments by key for easier lookup
+  # Map environments by their GitHub API key format for resource creation
+  # GitHub API uses "repo:environment" format while Azure resources use "repo-environment"
+  # This creates a lookup map using the GitHub format as the key
   environments_map = {
     for env in flatten([
       for repo in local.repositories : [
         for env_item in repo.environments : {
           repository          = repo.repo
           environment         = env_item.name
-          key                 = "${repo.repo}:${env_item.name}"
-          full_key            = "${repo.repo}-${env_item.name}"
+          key                 = "${repo.repo}:${env_item.name}"           # GitHub API format (colon-separated)
+          full_key            = "${repo.repo}-${env_item.name}"           # Azure resource format (dash-separated)
           prevent_destroy     = try(env_item.prevent_destroy, false)
-          wait_timer          = try(env_item.wait_timer, 0)
-          prevent_self_review = try(env_item.prevent_self_review, false)
+          wait_timer          = try(env_item.wait_timer, 0)               # Minutes to wait before allowing deployment
+          prevent_self_review = try(env_item.prevent_self_review, false)  # Prevent self-approval of deployments
+          
+          # Reviewer configuration
           reviewers = {
             users = try(env_item.reviewers.users, [])
             teams = try(env_item.reviewers.teams, [])
           }
+          
+          # Deployment policies
           branch_policy = try(env_item.deployment_branch_policy, null)
           tag_policy    = try(env_item.deployment_tag_policy, null)
-          variables     = try(env_item.variables, {})
-          secrets       = try(env_item.secrets, [])
+          
+          # Environment data
+          variables = try(env_item.variables, {})
+          secrets   = try(env_item.secrets, [])
         }
       ]
     ]) : env.key => env
   }
 
-  # Create a map of environment variables for each environment
+  # =============================================================================
+  # ENVIRONMENT VARIABLES PROCESSING
+  # =============================================================================
+  
+  # Create a map of environment variables organized by environment
+  # This flattens the variables from each environment into a single map
+  # Key format: "repo-environment" => { var_name => var_value }
   environment_variables = {
     for env in local.environments :
     env.full_key => try(env.variables, {})
   }
 
-  # Process secrets from each environment
+  # =============================================================================
+  # SECRETS PROCESSING
+  # =============================================================================
+  
+  # Process and flatten secrets from all environments
+  # Creates individual secret objects with proper key structure for resource creation
+  # Each secret gets its own entry with repository, environment, and secret details
   # TODO: Add GitHub Action runtime processing of secret values, we dont want secrets in the yaml files
   environment_secrets = flatten([
     for env in local.environments : [
       for secret in try(env.secrets, []) : {
-        key         = "${env.repository}:${env.environment}-${secret.name}"
-        full_key    = "${env.full_key}-${secret.name}"
-        repository  = env.repository
-        environment = env.environment
-        name        = secret.name
-        value       = secret.value
+        key         = "${env.repository}:${env.environment}-${secret.name}"  # Unique key for this secret
+        full_key    = "${env.full_key}-${secret.name}"                       # Resource naming key
+        repository  = env.repository                                          # GitHub repository
+        environment = env.environment                                         # Environment name
+        name        = secret.name                                             # Secret name
+        value       = secret.value                                            # Secret value
       }
     ]
   ])
 
-  # Map secrets by key for easier lookup
+  # Map secrets by their unique keys for easier resource lookup
+  # Converts the flattened list into a map for use in for_each loops
   secrets_map = {
     for secret in local.environment_secrets :
     secret.key => secret
   }
 
-  # Create a list of existing environments that need to be imported
+  # =============================================================================
+  # IMPORT HANDLING
+  # =============================================================================
+  
+  # Create a list of existing environments that need to be imported into Terraform state
+  # This allows the module to take over management of pre-existing GitHub environments
+  # Compares environments defined in YAML with those found in the GitHub API
   environments_to_import = flatten([
     for repo_name, repo_data in data.github_repository_environments.existing : [
       for env in repo_data.environments : "${repo_name}:${env.name}"
