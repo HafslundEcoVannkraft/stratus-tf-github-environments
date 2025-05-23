@@ -21,11 +21,6 @@ on:
         required: false
         type: string
         default: 'github-envrionments.yaml'
-      is_stratus_tf_examples:
-        description: 'Set to true if calling from stratus-tf-examples repo (optional, defaults to false)'
-        required: false
-        type: boolean
-        default: false
       operation:
         description: 'Operation to perform (apply or destroy)'
         required: true
@@ -115,7 +110,6 @@ jobs:
           {
             echo "github_owner = \"${{ github.event.inputs.github_owner }}\""
             echo "github_env_file = \"$(basename "$FOUND_ENV")\""
-            echo "is_stratus_tf_examples = ${{ github.event.inputs.is_stratus_tf_examples }}"
           } >> "$TFVARS_FILE"
 
           # Set outputs for downstream jobs

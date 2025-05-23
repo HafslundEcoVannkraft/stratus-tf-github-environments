@@ -47,10 +47,3 @@ variable "github_env_file" {
   type        = string
   default     = "github-envrionments.yaml"
 }
-
-variable "is_stratus_tf_examples" {
-  description = "Set to true if calling this module from the stratus-tf-examples repo."
-  type        = bool
-  ephemeral   = true
-  default     = false
-}
