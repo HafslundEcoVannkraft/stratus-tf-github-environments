@@ -51,7 +51,7 @@ locals {
       # Global roles (apply to all environments)
       [
         for role in try(local.github_environment_config.environments[env.container_environment].role_assignments.global, []) : {
-          key                   = "${env.key}-global-${role.role}"
+          key                   = "${env.key}-global-${role.role}-${md5(role.scope)}"
           environment_key       = env.key
           container_environment = env.container_environment
           environment_type      = endswith(env.environment, "-plan") ? "plan" : "apply"
@@ -68,7 +68,7 @@ locals {
           local.github_environment_config.environments[env.container_environment].role_assignments.apply,
           []
           ) : {
-          key                   = "${env.key}-${endswith(env.environment, "-plan") ? "plan" : "apply"}-${role.role}"
+          key                   = "${env.key}-${endswith(env.environment, "-plan") ? "plan" : "apply"}-${role.role}-${md5(role.scope)}"
           environment_key       = env.key
           container_environment = env.container_environment
           environment_type      = endswith(env.environment, "-plan") ? "plan" : "apply"
