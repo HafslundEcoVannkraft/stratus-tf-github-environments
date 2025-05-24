@@ -9,6 +9,9 @@ permissions:
   contents: read
   pull-requests: write
   checks: write
+  issues: write  # Required for auto-labeling PRs
+  # Note: 'issues: write' permission would be needed for auto-labeling
+  # If not available, the workflow will suggest labels in a comment instead
 
 jobs:
   # Terraform validation and formatting
@@ -429,58 +432,92 @@ jobs:
 
       - name: Auto-assign labels
         uses: actions/github-script@v7
+        continue-on-error: true  # Don't fail the workflow if labeling fails
         with:
           script: |
             const { owner, repo } = context.repo;
             const { number } = context.issue;
             
-            // Get changed files
-            const { data: files } = await github.rest.pulls.listFiles({
-              owner,
-              repo,
-              pull_number: number
-            });
-            
-            const labels = [];
-            const changedFiles = files.map(f => f.filename);
-            
-            // Determine labels based on changed files
-            if (changedFiles.some(f => f.endsWith('.tf'))) {
-              labels.push('terraform');
-            }
-            if (changedFiles.some(f => f.includes('README.md') || f.includes('CONTRIBUTING.md'))) {
-              labels.push('documentation');
-            }
-            if (changedFiles.some(f => f.includes('examples/'))) {
-              labels.push('examples');
-            }
-            if (changedFiles.some(f => f.includes('.github/'))) {
-              labels.push('github-actions');
-            }
-            if (changedFiles.some(f => f.includes('version.tf') || f.includes('dependabot'))) {
-              labels.push('dependencies');
-            }
-            
-            // Add size label based on changes
-            const totalChanges = files.reduce((sum, f) => sum + f.changes, 0);
-            if (totalChanges < 10) {
-              labels.push('size/XS');
-            } else if (totalChanges < 30) {
-              labels.push('size/S');
-            } else if (totalChanges < 100) {
-              labels.push('size/M');
-            } else if (totalChanges < 500) {
-              labels.push('size/L');
-            } else {
-              labels.push('size/XL');
-            }
-            
-            // Apply labels
-            if (labels.length > 0) {
-              await github.rest.issues.addLabels({
+            try {
+              // Get changed files
+              const { data: files } = await github.rest.pulls.listFiles({
                 owner,
                 repo,
-                issue_number: number,
-                labels
+                pull_number: number
               });
+              
+              const labels = [];
+              const changedFiles = files.map(f => f.filename);
+              
+              // Determine labels based on changed files
+              if (changedFiles.some(f => f.endsWith('.tf'))) {
+                labels.push('terraform');
+              }
+              if (changedFiles.some(f => f.includes('README.md') || f.includes('CONTRIBUTING.md'))) {
+                labels.push('documentation');
+              }
+              if (changedFiles.some(f => f.includes('examples/'))) {
+                labels.push('examples');
+              }
+              if (changedFiles.some(f => f.includes('.github/'))) {
+                labels.push('github-actions');
+              }
+              if (changedFiles.some(f => f.includes('version.tf') || f.includes('dependabot'))) {
+                labels.push('dependencies');
+              }
+              
+              // Add size label based on changes
+              const totalChanges = files.reduce((sum, f) => sum + f.changes, 0);
+              if (totalChanges < 10) {
+                labels.push('size/XS');
+              } else if (totalChanges < 30) {
+                labels.push('size/S');
+              } else if (totalChanges < 100) {
+                labels.push('size/M');
+              } else if (totalChanges < 500) {
+                labels.push('size/L');
+              } else {
+                labels.push('size/XL');
+              }
+              
+              // Check if labels exist before trying to apply them
+              if (labels.length > 0) {
+                console.log(`Attempting to apply labels: ${labels.join(', ')}`);
+                
+                // Try to apply labels, but handle permission errors gracefully
+                try {
+                  await github.rest.issues.addLabels({
+                    owner,
+                    repo,
+                    issue_number: number,
+                    labels
+                  });
+                  console.log(`✅ Successfully applied labels: ${labels.join(', ')}`);
+                } catch (labelError) {
+                  if (labelError.status === 403) {
+                    console.log(`⚠️ Permission denied for adding labels. This is expected if the GitHub token doesn't have 'issues: write' permission.`);
+                    console.log(`📋 Suggested labels for manual application: ${labels.join(', ')}`);
+                    
+                    // Add a comment with suggested labels instead
+                    try {
+                      await github.rest.issues.createComment({
+                        issue_number: number,
+                        owner,
+                        repo,
+                        body: `## 🏷️ Suggested Labels\n\nThe auto-labeling workflow suggests the following labels for this PR:\n\n${labels.map(label => `- \`${label}\``).join('\n')}\n\n> **Note**: Auto-labeling requires 'issues: write' permission. Please apply these labels manually if desired.`
+                      });
+                      console.log(`✅ Added comment with suggested labels`);
+                    } catch (commentError) {
+                      console.log(`⚠️ Could not add comment with suggested labels: ${commentError.message}`);
+                    }
+                  } else {
+                    throw labelError; // Re-throw if it's not a permission error
+                  }
+                }
+              } else {
+                console.log(`ℹ️ No labels to apply for this PR`);
+              }
+            } catch (error) {
+              console.error(`❌ Auto-labeling failed: ${error.message}`);
+              // Don't throw the error - let the job succeed but log the issue
             } 
