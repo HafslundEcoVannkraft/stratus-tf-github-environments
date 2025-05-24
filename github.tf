@@ -10,19 +10,21 @@
 # =============================================================================
 
 locals {
-  # GitHub API retry configuration
+  # GitHub API retry configuration (static values only)
   github_api_config = {
     max_retries = 3
     retry_delay = "30s"
     rate_limit_buffer = 10 # Keep 10 requests in reserve
-    
-    # Batch processing for large deployments
     batch_size = 20
+  }
+  
+  # Computed values based on configuration
+  github_api_computed = {
     enable_batching = length(local.environments) > local.github_api_config.batch_size
   }
   
   # Environment batches for large deployments
-  environment_batches = local.github_api_config.enable_batching ? [
+  environment_batches = local.github_api_computed.enable_batching ? [
     for i in range(0, length(local.environments), local.github_api_config.batch_size) :
     slice(local.environments, i, min(i + local.github_api_config.batch_size, length(local.environments)))
   ] : [local.environments]
