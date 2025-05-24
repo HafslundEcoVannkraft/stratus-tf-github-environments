@@ -14,7 +14,7 @@ data "terraform_remote_state" "container_app_environment" {
     resource_group_name  = "${var.code_name}-state-rg-${var.environment}"
     storage_account_name = var.state_storage_account_name
     container_name       = "tfstate"                                                                # Azure Storage container name
-    key                  = try("${var.environment}.tfstate", "examples/corp/container_app.tfstate") # Blob name/path within the container, fallback to examples/corp/container_app.tfstate to support stratus-tf-examples usage
+    key                  = try("examples/corp/container_app.tfstate", "${var.environment}.tfstate") # Blob name/path within the container, fallback to examples/corp/container_app.tfstate to support stratus-tf-examples usage
   }
 }
 
