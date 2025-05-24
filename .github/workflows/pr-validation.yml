@@ -367,8 +367,8 @@ jobs:
         run: |
           echo "Validating commit messages against conventional commits..."
           
-          # Get commits in this PR
-          commits=$(git log --format="%H %s" origin/main..HEAD)
+          # Get commits in this PR (excluding merge commits)
+          commits=$(git log --format="%H %s" --no-merges origin/main..HEAD)
           
           # Conventional commit pattern
           pattern="^(feat|fix|docs|style|refactor|test|chore)(\(.+\))?: .{1,50}"
