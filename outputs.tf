@@ -71,11 +71,11 @@ output "role_assignments_summary" {
     ]
     remote_state_role_types = [
       "global - Applied to all environments",
-      "plan - Applied only to environments ending with '-plan'", 
+      "plan - Applied only to environments ending with '-plan'",
       "apply - Applied only to environments NOT ending with '-plan'"
     ]
-    total_assignments = length(local.environment_role_assignments)
-    environments_with_roles = length(distinct([for assignment in local.environment_role_assignments : assignment.environment_key]))
+    total_assignments           = length(local.environment_role_assignments)
+    environments_with_roles     = length(distinct([for assignment in local.environment_role_assignments : assignment.environment_key]))
     container_environments_used = length(distinct([for assignment in local.environment_role_assignments : assignment.container_environment]))
     container_environment_mapping = {
       for env in local.environments : env.key => env.container_environment
@@ -236,11 +236,11 @@ output "troubleshooting_info" {
 output "raw_configuration" {
   description = "Raw configuration data for advanced troubleshooting (use only if you know what you're doing)."
   value = {
-    parsed_repositories         = local.repositories
-    remote_state_outputs        = local.remote_state_outputs
-    terraform_backend_config    = local.terraform_backend
-    github_environment_config   = local.github_environment_config
-    processed_role_assignments  = local.environment_role_assignments
+    parsed_repositories        = local.repositories
+    remote_state_outputs       = local.remote_state_outputs
+    terraform_backend_config   = local.terraform_backend
+    github_environment_config  = local.github_environment_config
+    processed_role_assignments = local.environment_role_assignments
   }
   sensitive = false
 }

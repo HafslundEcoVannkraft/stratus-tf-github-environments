@@ -46,38 +46,38 @@ locals {
   # This combines global roles with environment-specific roles based on environment type
   # Role assignments come from the Azure environment-specific configuration
   environment_role_assignments = flatten([
-    for env in local.environments : 
-      concat(
-        # Global roles (apply to all environments)
-        [
-          for role in try(local.github_environment_config.environments[env.container_environment].role_assignments.global, []) : {
-            key                   = "${env.key}-global-${role.role}"
-            environment_key       = env.key
-            container_environment = env.container_environment
-            environment_type      = endswith(env.environment, "-plan") ? "plan" : "apply"
-            managed_identity_id   = module.managed_identity_app_repositories[env.key].principal_id
-            scope                 = role.scope
-            role_definition_name  = role.role
-          }
-        ],
-        # Environment-specific roles (plan or apply)
-        [
-          for role in try(
-            endswith(env.environment, "-plan") ? 
-              local.github_environment_config.environments[env.container_environment].role_assignments.plan :
-              local.github_environment_config.environments[env.container_environment].role_assignments.apply,
-            []
+    for env in local.environments :
+    concat(
+      # Global roles (apply to all environments)
+      [
+        for role in try(local.github_environment_config.environments[env.container_environment].role_assignments.global, []) : {
+          key                   = "${env.key}-global-${role.role}"
+          environment_key       = env.key
+          container_environment = env.container_environment
+          environment_type      = endswith(env.environment, "-plan") ? "plan" : "apply"
+          managed_identity_id   = module.managed_identity_app_repositories[env.key].principal_id
+          scope                 = role.scope
+          role_definition_name  = role.role
+        }
+      ],
+      # Environment-specific roles (plan or apply)
+      [
+        for role in try(
+          endswith(env.environment, "-plan") ?
+          local.github_environment_config.environments[env.container_environment].role_assignments.plan :
+          local.github_environment_config.environments[env.container_environment].role_assignments.apply,
+          []
           ) : {
-            key                   = "${env.key}-${endswith(env.environment, "-plan") ? "plan" : "apply"}-${role.role}"
-            environment_key       = env.key
-            container_environment = env.container_environment
-            environment_type      = endswith(env.environment, "-plan") ? "plan" : "apply"
-            managed_identity_id   = module.managed_identity_app_repositories[env.key].principal_id
-            scope                 = role.scope
-            role_definition_name  = role.role
-          }
-        ]
-      )
+          key                   = "${env.key}-${endswith(env.environment, "-plan") ? "plan" : "apply"}-${role.role}"
+          environment_key       = env.key
+          container_environment = env.container_environment
+          environment_type      = endswith(env.environment, "-plan") ? "plan" : "apply"
+          managed_identity_id   = module.managed_identity_app_repositories[env.key].principal_id
+          scope                 = role.scope
+          role_definition_name  = role.role
+        }
+      ]
+    )
   ])
 
   # Map role assignments by their unique keys for resource creation
@@ -156,35 +156,27 @@ locals {
   environments = flatten([
     for repo in local.repositories : [
       for env in repo.environments : {
-        repository         = repo.repo                       # GitHub repository name
-        environment        = env.name                        # Environment name (dev, staging, prod, etc.)
-        key                = "${repo.repo}:${env.name}"      # Standard GitHub format (colon-separated)
-        azure_resource_key = "${repo.repo}-${env.name}"      # Azure-compatible format (only for resource naming)
+        repository            = repo.repo                                 # GitHub repository name
+        environment           = env.name                                  # Environment name (dev, staging, prod, etc.)
+        key                   = "${repo.repo}:${env.name}"                # Standard GitHub format (colon-separated)
+        azure_resource_key    = "${repo.repo}-${env.name}"                # Azure-compatible format (only for resource naming)
         container_environment = try(env.container_environment, "default") # Maps to remote state environments key
-        prevent_destroy    = try(env.prevent_destroy, false) # Lifecycle protection setting
-
-        # Get remote state configuration for this Container App Environment
-        container_env_key = try(env.container_environment, "default")
-        remote_config = try(local.github_environment_config.environments[container_env_key], {
-          variables        = {}
-          secrets          = {}
-          settings         = {}
-          role_assignments = { global = [], plan = [], apply = [] }
-        })
+        prevent_destroy       = try(env.prevent_destroy, false)           # Lifecycle protection setting
 
         # Settings with precedence: Remote State → YAML (YAML wins)
-        wait_timer          = try(env.wait_timer, try(remote_config.settings.wait_timer, 0))
-        prevent_self_review = try(env.prevent_self_review, try(remote_config.settings.prevent_self_review, false))
-        
+        # Get settings from the specific Container App Environment configuration
+        wait_timer          = try(env.wait_timer, try(local.github_environment_config.environments[try(env.container_environment, "default")].settings.wait_timer, 0))
+        prevent_self_review = try(env.prevent_self_review, try(local.github_environment_config.environments[try(env.container_environment, "default")].settings.prevent_self_review, false))
+
         # Reviewer configuration for deployment approvals
-        reviewers = try(env.reviewers, try(remote_config.settings.reviewers, {
+        reviewers = try(env.reviewers, try(local.github_environment_config.environments[try(env.container_environment, "default")].settings.reviewers, {
           users = [] # Default empty if nothing specified
           teams = []
         }))
 
         # Branch and tag deployment policies
-        branch_policy = try(env.deployment_branch_policy, try(remote_config.settings.deployment_branch_policy, null))
-        tag_policy    = try(env.deployment_tag_policy, try(remote_config.settings.deployment_tag_policy, null))
+        branch_policy = try(env.deployment_branch_policy, try(local.github_environment_config.environments[try(env.container_environment, "default")].settings.deployment_branch_policy, null))
+        tag_policy    = try(env.deployment_tag_policy, try(local.github_environment_config.environments[try(env.container_environment, "default")].settings.deployment_tag_policy, null))
 
         # Environment-specific configuration
         variables = try(env.variables, {}) # Environment variables to set (YAML only, merged later)
