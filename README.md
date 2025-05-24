@@ -141,16 +141,21 @@ Follow your team's standard workflow to get your changes into the main branch:
 
 Once your changes are merged to the main branch, run the workflow using GitHub CLI:
 
-1. First, ensure you have a GitHub token with the proper permissions:
+1. **Setup GitHub CLI Authentication** (recommended):
    ```bash
-   # Using GitHub CLI on an authorized environment with network access
-   gh auth login --web --scopes "repo,workflow,read:org,write:packages"
-   ```
-
-2. Verify you have a token with the required scopes
-   ```bash   
+   # Install GitHub CLI if not already installed
+   # macOS: brew install gh
+   # Windows: winget install GitHub.cli
+   # Linux: See https://github.com/cli/cli#installation
+   
+   # Authenticate with GitHub (one-time setup)
+   gh auth login
+   
+   # Verify authentication
    gh auth status
    ```
+
+   > **💡 Why GitHub CLI?** GitHub CLI tokens never expire, have automatic scope management, and provide better security than Personal Access Tokens. See our [Authentication Guide](./AUTHENTICATION.md) for detailed setup instructions.
 
 2. Run the workflow with your token:
 
@@ -299,7 +304,7 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
-| `github_token` | Yes | - | GitHub token with repo, workflow, and read:org permissions |
+| `github_token` | Yes | - | **GitHub CLI token (recommended)**: Use `$(gh auth token)` for secure, never-expiring authentication. See [Authentication Guide](./AUTHENTICATION.md) for setup. |
 | `tfvars_file` | Yes | - | Filename of tfvars file (searched recursively) |
 | `operation` | No | `apply` | Operation to perform (`apply` or `destroy`) |
 | `github_env_file` | No | `github-environments.yaml` | Filename of GitHub environment config |
@@ -366,10 +371,12 @@ This module is specifically focused on setting up the connection between GitHub 
 
 ## Prerequisites
 
+- **GitHub CLI** (recommended for authentication) - [Installation Guide](https://github.com/cli/cli#installation)
 - GitHub repository with proper permissions
-- GitHub token with `repo` and `workflow` permissions
 - Azure subscription with contributor rights
 - Terraform >= 1.3.0
+
+> **Authentication**: We strongly recommend using GitHub CLI authentication (`gh auth login`) instead of Personal Access Tokens. GitHub CLI tokens never expire and provide better security. See our [Authentication Guide](./AUTHENTICATION.md) for detailed setup instructions.
 
 ## Understanding Environment Types in Stratus
 
