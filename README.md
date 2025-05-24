@@ -30,6 +30,7 @@
 
 ## Table of Contents
 
+- [📚 Documentation Index](./DOCUMENTATION_INDEX.md) - Find the right guide for your needs
 - [Quick Setup Guide](#quick-setup-guide)
 - [Features](#features)
 - [Prerequisites](#prerequisites)

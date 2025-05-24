@@ -1,6 +1,28 @@
 # Contributing to GitHub Environment Vending for Azure Container Apps
 
-Thank you for your interest in contributing to this project! This guide will help you understand how to contribute effectively.
+## 🌟 **New to Contributing? Start Here!**
+
+**Welcome!** 🎉 If you're new to open source or just want to make a quick contribution, check out our **[Community Contributing Guide](./CONTRIBUTING_COMMUNITY.md)** - it's designed to get you started in minutes!
+
+### 🎯 **Quick Contribution Paths**
+- 🐛 **Found a typo?** → [Community Guide](./CONTRIBUTING_COMMUNITY.md) (2 minutes)
+- 📚 **Want to improve docs?** → [Community Guide](./CONTRIBUTING_COMMUNITY.md) (5-30 minutes)  
+- 🧪 **Test examples?** → [Community Guide](./CONTRIBUTING_COMMUNITY.md) (15 minutes)
+- ✨ **Add features?** → Continue reading this detailed guide
+
+---
+
+## 🔧 **Detailed Development Guide**
+
+This guide is for **experienced contributors** who want to:
+- Add new features or significant enhancements
+- Work on complex bug fixes
+- Contribute to the core architecture
+- Set up a full development environment
+
+**For simple contributions, use the [Community Guide](./CONTRIBUTING_COMMUNITY.md) instead!**
+
+---
 
 ## 🚀 Quick Start for Contributors
 

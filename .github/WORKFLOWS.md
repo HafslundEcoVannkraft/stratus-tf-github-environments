@@ -129,7 +129,8 @@ To change auto-merge behavior:
 
 ## 📚 Related Documentation
 
-- [Contributing Guide](../CONTRIBUTING.md) - Development workflow
+- [Community Contributing Guide](../CONTRIBUTING_COMMUNITY.md) - Quick start for new contributors
+- [Detailed Contributing Guide](../CONTRIBUTING.md) - Full development workflow
 - [Dependabot Configuration](DEPENDABOT.md) - Dependency management
 - [Pull Request Template](PULL_REQUEST_TEMPLATE.md) - PR requirements
 

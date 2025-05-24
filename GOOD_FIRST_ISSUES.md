@@ -15,7 +15,7 @@ This document contains a list of beginner-friendly tasks that are perfect for ne
 2. **Add missing periods to bullet points**
    - **What**: Ensure consistent punctuation in lists
    - **Why**: Professional documentation standards
-   - **Files**: README.md, CONTRIBUTING.md
+   - **Files**: README.md, CONTRIBUTING_COMMUNITY.md, CONTRIBUTING.md
    - **Skills**: Attention to detail
 
 3. **Improve code block formatting**
@@ -117,7 +117,7 @@ This document contains a list of beginner-friendly tasks that are perfect for ne
 16. **Improve section headings**
     - **What**: Make headings more descriptive and scannable
     - **Why**: Better navigation and understanding
-    - **Files**: README.md, CONTRIBUTING.md
+    - **Files**: README.md, CONTRIBUTING_COMMUNITY.md, CONTRIBUTING.md
     - **Skills**: Technical writing
 
 ### 🟡 Medium (1-2 hours)
@@ -174,6 +174,5 @@ This document contains a list of beginner-friendly tasks that are perfect for ne
 - **Test your changes**: Make sure everything still works
 - **Have fun**: Contributing should be enjoyable!
 
----
-
 **Ready to contribute?** Check our [open good first issues](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or create one from this list! 🚀 
+
