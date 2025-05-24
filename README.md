@@ -20,7 +20,7 @@
 - ✨ **Add features** - Check our [good first issues](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 - 🧪 **Test examples** - Try our configurations and share feedback
 
-**New to open source?** Perfect! Check our [Community Contributing Guide](./CONTRIBUTING_COMMUNITY.md) for a gentle introduction.
+**New to open source?** Perfect! Check our [Contributing Guide](./CONTRIBUTING.md) for a gentle introduction.
 
 ---
 
@@ -30,7 +30,6 @@
 
 ## Table of Contents
 
-- [📚 Documentation Index](./DOCUMENTATION_INDEX.md) - Find the right guide for your needs
 - [Quick Setup Guide](#quick-setup-guide)
 - [Features](#features)
 - [Prerequisites](#prerequisites)

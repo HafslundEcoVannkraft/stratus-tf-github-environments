@@ -6,7 +6,7 @@ We're here to help! There are several ways to get support for this project.
 
 ### 📚 **Documentation First**
 - **[README.md](../README.md)** - Complete setup and usage guide
-- **[Community Contributing Guide](../CONTRIBUTING_COMMUNITY.md)** - For contributors
+- **[Contributing Guide](../CONTRIBUTING.md)** - For contributors
 - **[Examples](../examples/)** - Working configuration examples
 
 ### 🐛 **Found a Bug?**
@@ -25,7 +25,7 @@ We're here to help! There are several ways to get support for this project.
 
 ### 🌟 **Contributing**
 - **[Good First Issues](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** - Start here if you want to contribute
-- **[Community Guide](../CONTRIBUTING_COMMUNITY.md)** - Gentle introduction to contributing
+- **[Contributing Guide](../CONTRIBUTING.md)** - Development workflow and quick start
 
 ## ⚡ Response Times
 
@@ -83,4 +83,12 @@ When asking for help:
 
 ## 🎉 Thank You!
 
-Thank you for using this project and being part of our community. Your questions, feedback, and contributions make this project better for everyone! 🚀 
+Thank you for using this project and being part of our community. Your questions, feedback, and contributions make this project better for everyone! 🚀
+
+## 🤝 **Contributing to Documentation**
+
+Found outdated info? Want to improve clarity? Documentation contributions are always welcome!
+
+- **Quick fixes**: Use the [Contributing Guide](../CONTRIBUTING.md)
+- **Major updates**: Use the [Contributing Guide](../CONTRIBUTING.md)
+- **Questions**: Check the [Support Guide](./.github/SUPPORT.md) 

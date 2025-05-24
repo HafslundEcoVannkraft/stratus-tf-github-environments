@@ -1,7 +1,7 @@
 blank_issues_enabled: true
 contact_links:
-  - name: 🤝 Community Contributing Guide
-    url: https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/blob/main/CONTRIBUTING_COMMUNITY.md
+  - name: 🤝 Contributing Guide
+    url: https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/blob/main/CONTRIBUTING.md
     about: New to contributing? Start here for a gentle introduction!
   
   - name: 💬 Ask a Question

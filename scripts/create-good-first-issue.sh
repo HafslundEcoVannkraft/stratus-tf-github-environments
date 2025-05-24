@@ -106,7 +106,7 @@ Scan through our README.md file and fix any spelling or grammar errors you find.
 - [ ] Links still work correctly
 
 ### Need help?
-- Check our [Contributing Guide](./CONTRIBUTING_COMMUNITY.md)
+- Check our [Contributing Guide](./CONTRIBUTING.md)
 - Ask questions in the comments below
 - We're here to help! 🤝
 

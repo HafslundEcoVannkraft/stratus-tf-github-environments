@@ -46,7 +46,7 @@ Here's what happens next:
 - 💬 Feel free to ask questions in the comments if you need help
 
 ### 📚 Helpful Resources
-- [Community Contributing Guide](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/CONTRIBUTING_COMMUNITY.md)
+- [Contributing Guide](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/CONTRIBUTING.md)
 - [Support Documentation](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/.github/SUPPORT.md)
 
 We appreciate your contribution and look forward to working with you! 🤝`;
