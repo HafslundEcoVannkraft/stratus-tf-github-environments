@@ -3,6 +3,11 @@ name: Create ACA GitHub Environments
 on:
   workflow_dispatch:
     inputs:
+      github_env_file:
+        description: 'Filename of GitHub environment config (optional, defaults to github-envrionments.yaml)'
+        required: false
+        type: string
+        default: 'github-envrionments.yaml'
       tfvars_file:
         description: 'Filename of tfvars file (required, will be searched for recursively in the repository)'
         required: true
@@ -16,14 +21,24 @@ on:
         required: false
         type: string
         default: 'HafslundEcoVannkraft'
-      github_env_file:
-        description: 'Filename of GitHub environment config (optional, defaults to github-envrionments.yaml)'
+      remote_state_rg:
+        description: 'Optional: Override the defaults from tfvars file.'
         required: false
         type: string
-        default: 'github-envrionments.yaml'
+      remote_state_sa_name:
+        description: 'Optional: Override the defaults from tfvars file.'
+        required: false
+        type: string
+      remote_state_container:
+        description: 'Optional: Override the default tfstate container.'
+        required: false
+        type: string
+      remote_state_key:
+        description: 'Optional: Override the default <environment>.tfstate.'
+        required: false
       operation:
         description: 'Operation to perform (apply or destroy)'
-        required: true
+        required: false
         type: choice
         options:
           - apply
@@ -42,15 +57,11 @@ jobs:
       TF_WORKSPACE: terraform-work
     outputs:
       environment: ${{ steps.copy_files.outputs.environment }}
-      code_name: ${{ steps.copy_files.outputs.code_name }}
-      location: ${{ steps.copy_files.outputs.location }}
-      subscription_id: ${{ steps.copy_files.outputs.subscription_id }}
-      resource_group: ${{ steps.copy_files.outputs.resource_group }}
       tfvars_file: ${{ steps.copy_files.outputs.tfvars_file }}
       cache_key: ${{ steps.create_cache_key.outputs.cache_key }}
       tf_workspace: ${{ steps.copy_files.outputs.tf_workspace }}
     steps:
-      # Checkout the IaC repository (this repo)
+      # Checkout the IaC repository where you copied this workflow, we need the tfvars file
       - name: Checkout IaC repository
         uses: actions/checkout@v4.2.2
 
@@ -66,58 +77,78 @@ jobs:
       - name: Find and copy tfvars and env file
         id: copy_files
         run: |
-          # Find the tfvars file (search recursively if only a filename is given)
+          # Always try to find the file recursively if not found at the given path
           TFVARS_FILE="${{ github.event.inputs.tfvars_file }}"
-          if [[ "$TFVARS_FILE" != *"/"* ]]; then
-            FOUND_TFVARS=$(find . -name "$TFVARS_FILE" -type f | head -n 1)
+          if [ ! -f "$TFVARS_FILE" ]; then
+            # Try to find by full path match (relative to repo root)
+            FOUND_TFVARS=$(find . -path "*/$TFVARS_FILE" -type f | head -n 1)
+            if [ -z "$FOUND_TFVARS" ]; then
+              # Fallback: search by basename only
+              FOUND_TFVARS=$(find . -name "$(basename "$TFVARS_FILE")" -type f | head -n 1)
+            fi
             if [ -n "$FOUND_TFVARS" ]; then
               TFVARS_FILE="$FOUND_TFVARS"
+            else
+              echo "Error: tfvars file not found for input $TFVARS_FILE"
+              exit 1
             fi
-          fi
-          if [ ! -f "$TFVARS_FILE" ]; then
-            echo "Error: tfvars file not found at $TFVARS_FILE"
-            exit 1
           fi
 
           # Find the GitHub environment YAML file
           ENV_FILE="${{ github.event.inputs.github_env_file }}"
-          FOUND_ENV=$(find . -name "$ENV_FILE" -type f | head -n 1)
-          if [ -z "$FOUND_ENV" ]; then
-            echo "Error: Could not find GitHub environment file '$ENV_FILE' in repository"
-            exit 1
+          if [ ! -f "$ENV_FILE" ]; then
+            # Try to find by full path match (relative to repo root)
+            FOUND_ENV=$(find . -path "*/$ENV_FILE" -type f | head -n 1)
+            if [ -z "$FOUND_ENV" ]; then
+              # Fallback: search by basename only
+              FOUND_ENV=$(find . -name "$(basename "$ENV_FILE")" -type f | head -n 1)
+            fi
+            if [ -n "$FOUND_ENV" ]; then
+              ENV_FILE="$FOUND_ENV"
+            else
+              echo "Error: Could not find GitHub environment file '$ENV_FILE' in repository"
+              exit 1
+            fi
           fi
 
           # Copy both files to ${{ env.TF_WORKSPACE }}
           cp "$TFVARS_FILE" ${{ env.TF_WORKSPACE }}/
           TFVARS_FILE="${{ env.TF_WORKSPACE }}/$(basename "$TFVARS_FILE")"
-          cp "$FOUND_ENV" ${{ env.TF_WORKSPACE }}/
-          ENV_FILE="${{ env.TF_WORKSPACE }}/$(basename "$FOUND_ENV")"
+          cp "$ENV_FILE" ${{ env.TF_WORKSPACE }}/
+          ENV_FILE="${{ env.TF_WORKSPACE }}/$(basename "$ENV_FILE")"
 
-          # Extract variables for outputs
-          SUBSCRIPTION_ID=$(grep 'subscription_id' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
-          LOCATION=$(grep 'location' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
+          # Extract variables from tfvars file
           CODE_NAME=$(grep 'code_name' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
           ENVIRONMENT=$(grep 'environment' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
-          STATE_STORAGE_ACCOUNT=$(grep 'state_storage_account_name' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
-          RESOURCE_GROUP=$(grep 'resource_group_name' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
-          if [ -z "$RESOURCE_GROUP" ]; then
-            RESOURCE_GROUP="${CODE_NAME}-rg-tf-state"
-          fi
 
           # Ensure the file ends with a newline before appending
           tail -c1 "$TFVARS_FILE" | read -r _ || echo >> "$TFVARS_FILE"
 
           {
             echo "github_owner = \"${{ github.event.inputs.github_owner }}\""
-            echo "github_env_file = \"$(basename "$FOUND_ENV")\""
+            echo "github_env_file = \"$(basename "$ENV_FILE")\""
+            
+            # Add optional inputs only if they have values
+            if [ -n "${{ github.event.inputs.remote_state_rg }}" ]; then
+              echo "remote_state_rg = \"${{ github.event.inputs.remote_state_rg }}\""
+            fi
+            
+            if [ -n "${{ github.event.inputs.remote_state_sa_name }}" ]; then
+              echo "remote_state_sa_name = \"${{ github.event.inputs.remote_state_sa_name }}\""
+            fi
+            
+            if [ -n "${{ github.event.inputs.remote_state_container }}" ]; then
+              echo "remote_state_container = \"${{ github.event.inputs.remote_state_container }}\""
+            fi
+            
+            if [ -n "${{ github.event.inputs.remote_state_key }}" ]; then
+              echo "remote_state_key = \"${{ github.event.inputs.remote_state_key }}\""
+            fi
           } >> "$TFVARS_FILE"
 
           # Set outputs for downstream jobs
           echo "environment=$ENVIRONMENT" | tee -a "$GITHUB_OUTPUT" "$GITHUB_ENV"
           echo "code_name=$CODE_NAME" | tee -a "$GITHUB_OUTPUT" "$GITHUB_ENV"
-          echo "location=$LOCATION" | tee -a "$GITHUB_OUTPUT"
-          echo "subscription_id=$SUBSCRIPTION_ID" | tee -a "$GITHUB_OUTPUT"
-          echo "resource_group=$RESOURCE_GROUP" | tee -a "$GITHUB_OUTPUT"
           echo "tfvars_file=$(basename $TFVARS_FILE)" | tee -a "$GITHUB_OUTPUT"
           echo "tf_workspace=$TF_WORKSPACE" | tee -a "$GITHUB_OUTPUT"
 

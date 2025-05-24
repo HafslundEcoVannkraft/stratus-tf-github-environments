@@ -47,3 +47,27 @@ variable "github_env_file" {
   type        = string
   default     = "github-envrionments.yaml"
 }
+
+variable "remote_state_resource_group_name" {
+  description = "Optional: Override the default terraform remote state resource group name, the default resource group will be <code_name>-state-rg-<environment>"
+  type        = string
+  default     = null
+}
+
+variable "remote_state_storage_account_name" {
+  description = "Optional: Override the default terraform remote state storage account name, the default storage_account_name will be var.state_storage_account_name"
+  type        = string
+  default     = null
+}
+
+variable "remote_state_container" {
+  description = "Optional: Override the default terraform remote state container, the default container will be tfstate"
+  type        = string
+  default     = null
+}
+
+variable "remote_state_key" {
+  description = "Optional: Override the default terraform remote state key, the default key will be <environment>.tfstate"
+  type        = string
+  default     = null
+}
