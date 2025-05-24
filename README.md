@@ -142,10 +142,7 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
    gh workflow run vend-aca-github-environments.yml \
      -f github_token=$(gh auth token) \
      -f tfvars_file=<environment>.tfvars \
-     -f remote_state_rg=custom-state-rg \
-     -f remote_state_sa_name=customstateaccount \
-     -f remote_state_container=tfstate \
-     -f remote_state_key=custom-environment.tfstate
+     -f remote_state_config="rg=custom-state-rg,sa=customstateaccount,container=tfstate,key=custom-environment.tfstate"
    ```
 
    Where `<environment>` is your Stratus Azure environment name (e.g., `dev`, `test`, `prod`). 
@@ -158,11 +155,10 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
    - Environment name (`environment`)
    - Location (`location`)
 
-   **Optional Remote State Parameters** (only needed for custom setups):
-   - `remote_state_rg`: Override the resource group containing the remote Terraform state
-   - `remote_state_sa_name`: Override the storage account name for remote state
-   - `remote_state_container`: Override the container name (defaults to "tfstate")
-   - `remote_state_key`: Override the state file key (defaults to `<environment>.tfstate`)
+   **Optional Remote State Configuration** (only needed for custom setups):
+   - `remote_state_config`: Combined override string with format `key1=value1,key2=value2`
+   - Supported keys: `rg` (resource group), `sa` (storage account), `container` (container name), `key` (state file key)
+   - Examples: `"key=custom.tfstate"`, `"rg=custom-rg,key=custom.tfstate"`, `"rg=custom-rg,sa=customsa,container=tfstate,key=custom.tfstate"`
 
 > **How the Workflow Works**:
 > 1. The workflow checks out your IaC repo to find your configuration files
@@ -172,10 +168,11 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
 > 5. It runs Terraform in the context of the `terraform-work` folder
 > 6. No need to create or maintain Terraform files in your IaC repo!
 
-> **When to Use Optional Remote State Parameters**:
-> - **Standard Stratus Pattern**: Use only the basic parameters. The workflow automatically derives remote state configuration from your tfvars file following Stratus naming conventions.
-> - **Custom Setup**: Use the optional parameters if you have a non-standard remote state configuration or need to override the defaults.
-> - **Multi-Environment State**: Use `remote_state_key` to point to a different state file than the default `<environment>.tfstate`.
+> **When to Use Remote State Configuration**:
+> - **Standard Stratus Pattern**: No configuration needed. The workflow automatically derives remote state configuration from your tfvars file following Stratus naming conventions.
+> - **Custom Setup**: Use `remote_state_config` if you have a non-standard remote state configuration or need to override the defaults.
+> - **Partial Override**: You can override just specific parts, e.g., `"key=custom.tfstate"` to use a different state file while keeping other defaults.
+> - **Complete Override**: Override everything with `"rg=custom-rg,sa=customsa,container=tfstate,key=custom.tfstate"`.
 
 > **Configuration File Naming Conventions**:
 > 
@@ -231,6 +228,49 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
 >   -f github_env_file=github-environments-prod-ace1.yaml
 > ```
 
+> **Using Specific Repository Versions**:
+> ```bash
+> # Deploy from a specific IaC repository branch (e.g., feature branch for testing)
+> gh workflow run vend-aca-github-environments.yml \
+>   -f github_token=$(gh auth token) \
+>   -f tfvars_file=dev.tfvars \
+>   -f iac_repo_ref=feature/new-environments
+> 
+> # Deploy using a specific module version (for testing new module features)
+> gh workflow run vend-aca-github-environments.yml \
+>   -f github_token=$(gh auth token) \
+>   -f tfvars_file=dev.tfvars \
+>   -f module_repo_ref=feature/new-feature
+> 
+> # Deploy from specific release tags for both IaC and module
+> gh workflow run vend-aca-github-environments.yml \
+>   -f github_token=$(gh auth token) \
+>   -f tfvars_file=prod.tfvars \
+>   -f iac_repo_ref=v1.2.3 \
+>   -f module_repo_ref=v2.1.0
+> ```
+>
+> **Using Remote State Configuration**:
+> ```bash
+> # Override just the state file key
+> gh workflow run vend-aca-github-environments.yml \
+>   -f github_token=$(gh auth token) \
+>   -f tfvars_file=dev.tfvars \
+>   -f remote_state_config="key=container_app.tfstate"
+> 
+> # Override resource group and key
+> gh workflow run vend-aca-github-environments.yml \
+>   -f github_token=$(gh auth token) \
+>   -f tfvars_file=dev.tfvars \
+>   -f remote_state_config="rg=custom-state-rg,key=custom.tfstate"
+> 
+> # Complete custom remote state configuration
+> gh workflow run vend-aca-github-environments.yml \
+>   -f github_token=$(gh auth token) \
+>   -f tfvars_file=dev.tfvars \
+>   -f remote_state_config="rg=custom-rg,sa=customsa,container=tfstate,key=custom.tfstate"
+> ```
+
 ### 5. Workflow Parameters Reference
 
 | Parameter | Required | Default | Description |
@@ -240,12 +280,11 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
 | `operation` | No | `apply` | Operation to perform (`apply` or `destroy`) |
 | `github_env_file` | No | `github-environments.yaml` | Filename of GitHub environment config |
 | `github_owner` | No | `HafslundEcoVannkraft` | GitHub organization or user name |
-| `remote_state_rg` | No | Auto-derived | Override resource group for remote state |
-| `remote_state_sa_name` | No | Auto-derived | Override storage account for remote state |
-| `remote_state_container` | No | `tfstate` | Override container name for remote state |
-| `remote_state_key` | No | `<environment>.tfstate` | Override state file key |
+| `iac_repo_ref` | No | `main` | Git reference (branch, tag, or commit SHA) of IaC repository |
+| `remote_state_config` | No | - | Combined remote state override (e.g., "key=custom.tfstate" or "rg=custom-rg,key=custom.tfstate") |
+| `module_repo_ref` | No | `main` | Git reference (branch, tag, or commit SHA) of module repository |
 
-> **Auto-derived Parameters**: When using the standard Stratus IaC repository pattern, `remote_state_rg` and `remote_state_sa_name` are automatically derived from your tfvars file. Only specify these parameters if you need to override the defaults or have a custom setup.
+> **Auto-derived Parameters**: When using the standard Stratus IaC repository pattern, remote state configuration is automatically derived from your tfvars file. The `iac_repo_ref` and `module_repo_ref` default to `main` branch. Only specify `remote_state_config` if you need to override the defaults or have a custom setup.
 
 ### 6. Organizing Files in Your IaC Repository
 
@@ -340,7 +379,7 @@ This module works with **three distinct layers** of environments in the Stratus 
 ### Environment Relationship Example
 
 ```
-Stratus Landing Zone: "ecommerce-dev" (Azure Subscription)
+Stratus Landing Zone: "codename-dev" (Azure Subscription)
 ├── Azure Container App Environment: "ace1"
 │   ├── GitHub Environment: "ace1-dev-plan" (read-only)
 │   └── GitHub Environment: "ace1-dev-apply" (deployment)
@@ -393,79 +432,100 @@ For example, your organization might use a single Azure subscription with one Co
 
 ```mermaid
 flowchart TB
-    %% Stratus Landing Zones (Subscriptions)
-    subgraph StratusDevLZ["Stratus Landing Zone: ecommerce-dev (Azure Subscription)"]
-        DevACE1["Container App Environment: ace1<br>(Consumption Profile)"]
-        DevACE2["Container App Environment: ace2<br>(Consumption Profile)"] 
-        DevACE3["Container App Environment: background-jobs<br>(Consumption Profile)"]
-        DevShared["Shared Resources<br>(ACR, DNS, Storage)"]
+    %% IaC Repository Workflow
+    subgraph IaCRepo["🏗️ IaC Repository"]
+        Workflow["vend-aca-github-environments.yml<br/>Creates GitHub environments"]
     end
     
-    subgraph StratusProdLZ["Stratus Landing Zone: ecommerce-prod (Azure Subscription)"]
-        ProdACE1["Container App Environment: ace1<br>(Consumption Profile)"]
-        ProdACE2["Container App Environment: ace2<br>(Consumption Profile)"]
-        ProdShared["Shared Resources<br>(ACR, DNS, Storage)"]
+    %% Stratus Landing Zones (Azure Infrastructure)
+    subgraph StratusDevLZ["☁️ Stratus LZ: apollo-dev"]
+        DevACE1["ace1"]
+        DevACE2["ace2"] 
+        DevACE3["background-jobs"]
+        DevShared["Shared Resources"]
     end
     
-    %% GitHub Environments
-    subgraph GitHubEnvs["GitHub Environments (Deployment Workflows)"]
-        GH1["ace1-dev-plan"]
-        GH2["ace1-dev-apply"] 
-        GH3["ace2-dev-plan"]
-        GH4["ace2-dev-apply"]
-        GH5["background-jobs-dev-apply"]
-        GH6["ace1-prod-apply"]
-        GH7["ace2-prod-apply"]
+    subgraph StratusProdLZ["☁️ Stratus LZ: apollo-prod"]
+        ProdACE1["ace1"]
+        ProdACE2["ace2"]
+        ProdShared["Shared Resources"]
     end
+    
+    %% Application Source Code Repositories
+    subgraph AppRepos["📦 Application Repositories"]
+        subgraph FrontendRepo["frontend-app"]
+            FE1["ace1-dev-plan 👁️"]
+            FE2["ace1-dev-apply 🚀"] 
+            FE3["ace1-prod-apply 🚀"]
+        end
+        
+        subgraph BackendRepo["backend-api"]
+            BE1["ace2-dev-plan 👁️"]
+            BE2["ace2-dev-apply 🚀"]
+            BE3["ace2-prod-apply 🚀"]
+        end
+        
+        subgraph JobsRepo["data-processor"]
+            JB1["background-jobs-dev 🚀"]
+        end
+    end
+    
+    %% Workflow creates environments
+    Workflow ==> FrontendRepo
+    Workflow ==> BackendRepo
+    Workflow ==> JobsRepo
+    
+    %% Deployment connections (solid = deploy, dotted = plan)
+    FE1 -.-> DevACE1
+    FE2 --> DevACE1
+    FE3 --> ProdACE1
+    
+    BE1 -.-> DevACE2
+    BE2 --> DevACE2
+    BE3 --> ProdACE2
+    
+    JB1 --> DevACE3
     
     %% Styling
-    style StratusDevLZ fill:#d0e8ff,stroke:#0078d4,color:#0078d4
-    style StratusProdLZ fill:#d0e8ff,stroke:#0078d4,color:#0078d4
-    style GitHubEnvs fill:#e8f5e9,stroke:#2e7d32,color:#2e7d32
-    
-    %% Connections
-    GH1 -.-> DevACE1
-    GH2 --> DevACE1
-    GH3 -.-> DevACE2
-    GH4 --> DevACE2
-    GH5 --> DevACE3
-    GH6 --> ProdACE1
-    GH7 --> ProdACE2
-    
-    %% Legend
-    subgraph Legend["Legend"]
-        L1["Solid Line = Apply (Deployment)"]
-        L2["Dotted Line = Plan (Read-only)"]
-    end
-    style Legend fill:#f9f9f9,stroke:#666,color:#333
+    style StratusDevLZ fill:#e3f2fd,stroke:#1976d2,color:#0d47a1
+    style StratusProdLZ fill:#e3f2fd,stroke:#1976d2,color:#0d47a1
+    style IaCRepo fill:#fff3e0,stroke:#f57c00,color:#e65100
+    style AppRepos fill:#e8f5e9,stroke:#388e3c,color:#1b5e20
+    style FrontendRepo fill:#f3e5f5,stroke:#7b1fa2,color:#4a148c
+    style BackendRepo fill:#e0f2f1,stroke:#00695c,color:#004d40
+    style JobsRepo fill:#fce4ec,stroke:#c2185b,color:#880e4f
 ```
 
 **Understanding the Stratus Architecture:**
 
-**Stratus Landing Zones (Blue Boxes)**:
-- Each Stratus Landing Zone is a complete Azure subscription
-- Contains multiple Container App Environments for different applications/tiers
-- Includes shared resources (ACR, DNS zones, storage) used by all applications
-- Named using `code_name` + `environment` pattern (e.g., "myapp-dev", "myapp-prod")
+**🏗️ IaC Repository (Orange Box)**:
+- Contains the GitHub environment vending workflow
+- Runs `vend-aca-github-environments.yml` to create environments in application repositories
+- Manages centralized configuration and permissions
 
-**Container App Environments (Within Landing Zones)**:
-- Logical separation within a subscription for different applications or stages
-- Examples: `api`, `frontend`, `staging`, `integration`
-- Each can host multiple container applications
-- Mapped to via the `container_environment` property in your YAML
+**☁️ Stratus Landing Zones (Blue Boxes)**:
+- Complete Azure subscriptions with multiple Container App Environments
+- Each environment (ace1, ace2, background-jobs) has independent scaling
+- Shared resources (ACR, DNS, Storage) used by all applications
+- Named using `code_name` + `environment` pattern
 
-**GitHub Environments (Green Box)**:
-- Define deployment workflows, approvals, and security policies
-- Each targets a specific Container App Environment
-- Can be plan-only (dotted lines) or deployment-enabled (solid lines)
+**📦 Application Source Repositories (Colored Sub-boxes)**:
+- Each application has its own GitHub repository
+- Contains GitHub environments created by the IaC workflow
+- **👁️ Plan environments**: Read-only preview (dotted lines → Azure)
+- **🚀 Apply environments**: Actual deployment (solid lines → Azure)
+
+**Environment Targeting**:
+- Each GitHub environment targets exactly one Container App Environment
 - Multiple GitHub environments can target the same Container App Environment
+- Different applications can use different Container App Environments for isolation
 
-**Key Benefits of This Stratus Model**:
-- **Cost Efficiency**: Multiple applications share subscription-level resources
-- **Logical Separation**: Clear boundaries between different application tiers
-- **Flexible Security**: Different approval processes for the same target infrastructure
-- **Scalable Growth**: Add new applications without creating new subscriptions
-- **Operational Simplicity**: Centralized management of shared resources (ACR, DNS, etc.)
+**Key Benefits of This Architecture**:
+- **Centralized Management**: IaC repo controls all environment creation and permissions
+- **Application Isolation**: Each app repo has its own environments with appropriate permissions
+- **Flexible Targeting**: Applications can target different Container App Environments as needed
+- **Security Separation**: Plan vs Apply environments with different permission levels
+- **Cost Efficiency**: Multiple applications share the same Stratus Landing Zone subscription
 
 ## How This Module Fits in the Stratus Workflow
 
@@ -575,7 +635,7 @@ repositories:
 The `container_environment` property maps your GitHub environments to specific **Azure Container App Environments** within your Stratus Landing Zone. This enables flexible deployment patterns within a single subscription:
 
 ```yaml
-# Example: Stratus Landing Zone "ecommerce-dev" contains multiple Container App Environments
+# Example: Stratus Landing Zone "codename-dev" contains multiple Container App Environments
 repositories:
   - repo: my-web-frontend
     environments:
@@ -599,7 +659,7 @@ repositories:
 
 **Real-World Stratus Example**:
 ```
-Stratus Landing Zone: "ecommerce-dev" (Subscription)
+Stratus Landing Zone: "codename-dev" (Subscription)
 ├── Container App Environment: "ace1" (Consumption workload profile)
 │   └── GitHub Environments: ace1-dev-plan, ace1-dev-apply
 │   └── Services: web-frontend, api-gateway (independent scaling)

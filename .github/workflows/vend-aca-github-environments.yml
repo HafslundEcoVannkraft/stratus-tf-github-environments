@@ -21,21 +21,20 @@ on:
         required: false
         type: string
         default: 'HafslundEcoVannkraft'
-      remote_state_rg:
-        description: 'Optional: Override the defaults from tfvars file.'
+      iac_repo_ref:
+        description: 'Git reference (branch, tag, or commit SHA) of the IaC repository to checkout (optional, defaults to main)'
         required: false
         type: string
-      remote_state_sa_name:
-        description: 'Optional: Override the defaults from tfvars file.'
+        default: 'main'
+      remote_state_config:
+        description: 'Optional remote state override: rg=name,sa=name,container=name,key=name (e.g., "key=custom.tfstate" or "rg=custom-rg,key=custom.tfstate")'
         required: false
         type: string
-      remote_state_container:
-        description: 'Optional: Override the default tfstate container.'
+      module_repo_ref:
+        description: 'Git reference (branch, tag, or commit SHA) of the module repository (optional, defaults to main)'
         required: false
         type: string
-      remote_state_key:
-        description: 'Optional: Override the default <environment>.tfstate.'
-        required: false
+        default: 'main'
       operation:
         description: 'Operation to perform (apply or destroy)'
         required: false
@@ -64,12 +63,15 @@ jobs:
       # Checkout the IaC repository where you copied this workflow, we need the tfvars file
       - name: Checkout IaC repository
         uses: actions/checkout@v4.2.2
+        with:
+          ref: ${{ github.event.inputs.iac_repo_ref }}
 
       # Checkout the public Terraform module repo into a subfolder
       - name: Checkout public module
         uses: actions/checkout@v4
         with:
           repository: HafslundEcoVannkraft/stratus-tf-aca-gh-vending
+          ref: ${{ github.event.inputs.module_repo_ref }}
           path: ${{ env.TF_WORKSPACE }}
 
       # Find and copy the tfvars and environment YAML file to ${{ env.TF_WORKSPACE }}
@@ -128,21 +130,23 @@ jobs:
             echo "github_owner = \"${{ github.event.inputs.github_owner }}\""
             echo "github_env_file = \"$(basename "$ENV_FILE")\""
             
-            # Add optional inputs only if they have values
-            if [ -n "${{ github.event.inputs.remote_state_rg }}" ]; then
-              echo "remote_state_rg = \"${{ github.event.inputs.remote_state_rg }}\""
-            fi
-            
-            if [ -n "${{ github.event.inputs.remote_state_sa_name }}" ]; then
-              echo "remote_state_sa_name = \"${{ github.event.inputs.remote_state_sa_name }}\""
-            fi
-            
-            if [ -n "${{ github.event.inputs.remote_state_container }}" ]; then
-              echo "remote_state_container = \"${{ github.event.inputs.remote_state_container }}\""
-            fi
-            
-            if [ -n "${{ github.event.inputs.remote_state_key }}" ]; then
-              echo "remote_state_key = \"${{ github.event.inputs.remote_state_key }}\""
+            # Parse remote_state_config if provided (format: rg=name,sa=name,container=name,key=name)
+            if [ -n "${{ github.event.inputs.remote_state_config }}" ]; then
+              REMOTE_STATE_CONFIG="${{ github.event.inputs.remote_state_config }}"
+              
+              # Parse each key=value pair
+              IFS=',' read -ra PAIRS <<< "$REMOTE_STATE_CONFIG"
+              for pair in "${PAIRS[@]}"; do
+                if [[ $pair == rg=* ]]; then
+                  echo "remote_state_rg = \"${pair#rg=}\""
+                elif [[ $pair == sa=* ]]; then
+                  echo "remote_state_sa_name = \"${pair#sa=}\""
+                elif [[ $pair == container=* ]]; then
+                  echo "remote_state_container = \"${pair#container=}\""
+                elif [[ $pair == key=* ]]; then
+                  echo "remote_state_key = \"${pair#key=}\""
+                fi
+              done
             fi
           } >> "$TFVARS_FILE"
 
