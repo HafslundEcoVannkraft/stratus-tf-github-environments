@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       github_env_file:
-        description: 'Filename of GitHub environment config (optional, defaults to github-envrionments.yaml)'
+        description: 'Filename of GitHub environment config (optional, defaults to github-environments.yaml)'
         required: false
         type: string
-        default: 'github-envrionments.yaml'
+        default: 'github-environments.yaml'
       tfvars_file:
         description: 'Filename of tfvars file (required, will be searched for recursively in the repository)'
         required: true

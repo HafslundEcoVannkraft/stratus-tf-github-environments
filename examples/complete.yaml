@@ -2,8 +2,9 @@
 repositories:
   - repo: your-app-repo
     environments:
-      # Development: Minimal restrictions
+      # Development: Minimal restrictions, maps to dev Azure environment
       - name: dev
+        container_environment: dev  # Maps to "dev" key in remote state environments
         wait_timer: 0
         prevent_self_review: false
         reviewers:
@@ -12,7 +13,9 @@ repositories:
         # No branch policy means minimal restrictions
 
       # Staging: Short wait, required approvals, protected branches
+      # Can use same Azure environment as dev for cost optimization
       - name: staging
+        container_environment: dev  # Shares dev Container App Environment but with different protections
         wait_timer: 10
         prevent_self_review: true
         reviewers:
@@ -25,7 +28,9 @@ repositories:
           custom_branch_policies: false
 
       # Production: Longer wait, required approvals, tag restrictions
+      # Uses separate production Azure environment
       - name: prod
+        container_environment: prod  # Maps to "prod" key in remote state environments
         wait_timer: 30
         prevent_self_review: true
         reviewers:

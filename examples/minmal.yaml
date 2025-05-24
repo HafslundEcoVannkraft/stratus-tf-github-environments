@@ -3,6 +3,7 @@ repositories:
   - repo: your-app-repo
     environments:
       - name: dev
+        container_environment: dev  # Maps to "dev" key in remote state environments
         wait_timer: 0
         prevent_self_review: false
         reviewers:

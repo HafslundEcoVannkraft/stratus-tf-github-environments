@@ -6,6 +6,32 @@
 # -----------------------------------------------------------------------------
 
 # =============================================================================
+# ROLE ASSIGNMENTS FROM REMOTE STATE (NEW CONVENTION)
+# =============================================================================
+
+# Role assignments defined in remote state github_environment_config
+# This replaces the hardcoded role assignments below with a flexible approach
+# where the upstream infrastructure defines exactly what permissions each environment needs
+resource "azurerm_role_assignment" "github_environment_roles_from_remote_state" {
+  for_each = local.role_assignments_map
+
+  scope                = each.value.scope
+  role_definition_name = each.value.role_definition_name
+  principal_id         = each.value.managed_identity_id
+  principal_type       = "ServicePrincipal"
+
+  depends_on = [
+    module.managed_identity_app_repositories
+  ]
+}
+
+# =============================================================================
+# LEGACY ROLE ASSIGNMENTS (BACKWARD COMPATIBILITY)
+# =============================================================================
+# The following role assignments are kept for backward compatibility
+# They will be removed once all upstream modules migrate to the new convention
+
+# =============================================================================
 # SHARED PERMISSIONS (both plan and apply environments)
 # =============================================================================
 

@@ -51,26 +51,26 @@ You need just two files in your IaC repository:
 2. Create an environment configuration file in your repository - use the minimal configuragion
 
    ```bash
-   # Create the deployments directory if it doesn't exist
-   mkdir -p deployments
+   # Create the deployments/github directory if it doesn't exist
+   mkdir -p deployments/github
    
-   curl -o deployments/github-envrionments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/minmal.yaml
+   curl -o deployments/github/github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/minmal.yaml
    ```
 
 3. Or use the complete configuration
    
    ```bash
-   # Create the deployments directory if it doesn't exist
-   mkdir -p deployments
+   # Create the deployments/github directory if it doesn't exist
+   mkdir -p deployments/github
 
-   curl -o deployments/github-envrionments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/test/complete.yaml
+   curl -o deployments/github/github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/test/complete.yaml
    ```
 
-> **Note**: You can place the `github-envrionments.yaml` file anywhere in your repository. The workflow will search for it recursively from the repo root. You only need to specify the filename, not the full path.
+> **Note**: You can place the `github-environments.yaml` file anywhere in your repository. The workflow will search for it recursively from the repo root. You only need to specify the filename, not the full path.
 
 ### 2. Customize the Environment Configuration
 
-Edit `deployments/github-envrionments.yaml` to specify:
+Edit `deployments/github/github-environments.yaml` to specify:
 
 1. The GitHub repository name(s) where you want to enable environments
 2. The GitHub deployment environments to configure for each repository
@@ -83,6 +83,7 @@ repositories:
   - repo: your-app-repo-name
     environments:
       - name: dev
+        container_environment: dev  # Maps to "dev" key in remote state environments
         wait_timer: 0
         prevent_self_review: false
         reviewers:
@@ -101,7 +102,7 @@ Follow your team's standard workflow to get your changes into the main branch:
 
 2. Commit your changes
    ```bash
-   git add .github/workflows/vend-aca-github-environments.yml deployments/github-envrionments.yaml
+   git add .github/workflows/vend-aca-github-environments.yml deployments/github/github-environments.yaml
    git commit -m "Add GitHub environments configuration for ACA"
    ```
 
@@ -128,11 +129,28 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
    ```
 
 2. Run the workflow with your token:
+
+   **Standard Stratus IaC Repository Pattern** (recommended):
    ```bash
-   gh workflow run vend-aca-github-environments.yml -f github_token=$(gh auth token) -f tfvars_file=<environment>.tfvars -f operation=apply
+   gh workflow run vend-aca-github-environments.yml \
+     -f github_token=$(gh auth token) \
+     -f tfvars_file=<environment>.tfvars
    ```
 
-   Where `<environment>` is your Azure infrastructure environment name (e.g., `dev`, `test`, `prod`). This tfvars file should contain:
+   **Custom Setup with Remote State Overrides** (advanced):
+   ```bash
+   gh workflow run vend-aca-github-environments.yml \
+     -f github_token=$(gh auth token) \
+     -f tfvars_file=<environment>.tfvars \
+     -f remote_state_rg=custom-state-rg \
+     -f remote_state_sa_name=customstateaccount \
+     -f remote_state_container=tfstate \
+     -f remote_state_key=custom-environment.tfstate
+   ```
+
+   Where `<environment>` is your Stratus Azure environment name (e.g., `dev`, `test`, `prod`). 
+
+   **Required tfvars file contents**:
    - Azure subscription details (`subscription_id`)
    - Resource group information (`resource_group_name`, optional)
    - Storage account configuration for Terraform state (`state_storage_account_name`)
@@ -140,20 +158,127 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
    - Environment name (`environment`)
    - Location (`location`)
 
+   **Optional Remote State Parameters** (only needed for custom setups):
+   - `remote_state_rg`: Override the resource group containing the remote Terraform state
+   - `remote_state_sa_name`: Override the storage account name for remote state
+   - `remote_state_container`: Override the container name (defaults to "tfstate")
+   - `remote_state_key`: Override the state file key (defaults to `<environment>.tfstate`)
+
 > **How the Workflow Works**:
 > 1. The workflow checks out your IaC repo to find your configuration files
 > 2. It also checks out the public module repo directly into a `terraform-work` folder
 > 3. It copies your tfvars and environment YAML files to the `terraform-work` folder
-> 4. It runs Terraform in the context of the `terraform-work` folder
-> 5. No need to create or maintain Terraform files in your IaC repo!
+> 4. It automatically configures remote state access based on your tfvars or optional overrides
+> 5. It runs Terraform in the context of the `terraform-work` folder
+> 6. No need to create or maintain Terraform files in your IaC repo!
 
-> **Note about Configuration File**: If you're using the default filename `github-envrionments.yaml`, you don't need to specify it when running the workflow. If you renamed the file, include the parameter `-f github_env_file=<your-filename>.yaml`.
+> **When to Use Optional Remote State Parameters**:
+> - **Standard Stratus Pattern**: Use only the basic parameters. The workflow automatically derives remote state configuration from your tfvars file following Stratus naming conventions.
+> - **Custom Setup**: Use the optional parameters if you have a non-standard remote state configuration or need to override the defaults.
+> - **Multi-Environment State**: Use `remote_state_key` to point to a different state file than the default `<environment>.tfstate`.
+
+> **Configuration File Naming Conventions**:
+> 
+> **Simple Setup** (one Stratus environment, one Container App Environment):
+> - Use the default `github-environments.yaml` - no need to specify the filename parameter
+> 
+> **Multiple Stratus Environments** (dev, test, prod subscriptions):
+> - `github-environments-dev.yaml` - for dev Stratus Landing Zone
+> - `github-environments-test.yaml` - for test Stratus Landing Zone  
+> - `github-environments-prod.yaml` - for prod Stratus Landing Zone
+> - Specify with `-f github_env_file=github-environments-<environment>.yaml`
+> 
+> **Multiple Container App Environments** (different Container App Environments in same subscription):
+> - `github-environments-ace1.yaml` - for first Container App Environment
+> - `github-environments-ace2.yaml` - for second Container App Environment
+> - `github-environments-background-jobs.yaml` - for background processing Container App Environment
+> - Specify with `-f github_env_file=github-environments-<container-env>.yaml`
+> 
+> **Complex Setup** (multiple Stratus environments + multiple Container App Environments):
+> - `github-environments-dev-ace1.yaml` - ACE1 environments in dev Stratus LZ
+> - `github-environments-dev-ace2.yaml` - ACE2 environments in dev Stratus LZ
+> - `github-environments-prod-ace1.yaml` - ACE1 environments in prod Stratus LZ
+> - `github-environments-prod-ace2.yaml` - ACE2 environments in prod Stratus LZ
 
 > **Simplified File Parameters**: Both `github_env_file` and `tfvars_file` parameters accept just filenames without paths. The workflow will search for these files recursively from the repository root and use the first matching file found.
 
-> **Environment Relationship**: The Azure infrastructure environment specified in your tfvars file provides the resources and identities that your GitHub deployment environments will use. A single Azure environment can be targeted by multiple GitHub environments with different approval gates and protections.
+> **Stratus Environment Relationship**: 
+> - Your **tfvars file** defines the Stratus Landing Zone (Azure subscription)
+> - A **single Stratus Landing Zone** can be provisioned with multiple Azure Container App Environments (e.g., api, frontend, staging)
+> - Your **YAML `container_environment`** property maps to specific Container App Environments within that subscription
+> - Your **GitHub environments** define the deployment workflows and security policies for accessing those Container App Environments
+> - **Each GitHub environment targets exactly one Container App Environment** (one-to-one mapping per GitHub environment)
+> - **Multiple GitHub environments can target the same Container App Environment** with different protection levels (many-to-one relationship)
 
-### 5. Verify the Results
+> **Practical Example - Multiple Environments**:
+> ```bash
+> # Deploy ace1 environments to dev Stratus Landing Zone
+> gh workflow run vend-aca-github-environments.yml \
+>   -f github_token=$(gh auth token) \
+>   -f tfvars_file=dev.tfvars \
+>   -f github_env_file=github-environments-dev-ace1.yaml
+> 
+> # Deploy ace2 environments to dev Stratus Landing Zone  
+> gh workflow run vend-aca-github-environments.yml \
+>   -f github_token=$(gh auth token) \
+>   -f tfvars_file=dev.tfvars \
+>   -f github_env_file=github-environments-dev-ace2.yaml
+> 
+> # Deploy ace1 environments to prod Stratus Landing Zone
+> gh workflow run vend-aca-github-environments.yml \
+>   -f github_token=$(gh auth token) \
+>   -f tfvars_file=prod.tfvars \
+>   -f github_env_file=github-environments-prod-ace1.yaml
+> ```
+
+### 5. Workflow Parameters Reference
+
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `github_token` | Yes | - | GitHub token with repo, workflow, and read:org permissions |
+| `tfvars_file` | Yes | - | Filename of tfvars file (searched recursively) |
+| `operation` | No | `apply` | Operation to perform (`apply` or `destroy`) |
+| `github_env_file` | No | `github-environments.yaml` | Filename of GitHub environment config |
+| `github_owner` | No | `HafslundEcoVannkraft` | GitHub organization or user name |
+| `remote_state_rg` | No | Auto-derived | Override resource group for remote state |
+| `remote_state_sa_name` | No | Auto-derived | Override storage account for remote state |
+| `remote_state_container` | No | `tfstate` | Override container name for remote state |
+| `remote_state_key` | No | `<environment>.tfstate` | Override state file key |
+
+> **Auto-derived Parameters**: When using the standard Stratus IaC repository pattern, `remote_state_rg` and `remote_state_sa_name` are automatically derived from your tfvars file. Only specify these parameters if you need to override the defaults or have a custom setup.
+
+### 6. Organizing Files in Your IaC Repository
+
+For teams with multiple Stratus environments and Container App Environments, we recommend organizing your files like this:
+
+```
+your-iac-repo/
+├── .github/workflows/
+│   └── vend-aca-github-environments.yml
+├── deployments/
+│   ├── *.tf                                 # Terraform infrastructure files
+│   ├── tfvars/                              # Environment-specific tfvars
+│   │   ├── dev.tfvars                       # Stratus dev Landing Zone
+│   │   ├── test.tfvars                      # Stratus test Landing Zone  
+│   │   └── prod.tfvars                      # Stratus prod Landing Zone
+│   └── github/                              # GitHub environment configurations
+│       ├── github-environments.yaml                           # Default (simple setups)
+│       ├── github-environments-dev-ace1.yaml                  # ACE1 environments in dev
+│       ├── github-environments-dev-ace2.yaml                  # ACE2 environments in dev
+│       ├── github-environments-test-ace1.yaml                 # ACE1 environments in test
+│       ├── github-environments-prod-ace1.yaml                 # ACE1 environments in prod
+│       └── github-environments-prod-ace2.yaml                 # ACE2 environments in prod
+└── README.md
+```
+
+**File Organization Benefits**:
+- **Clear separation** between different Stratus Landing Zones
+- **Logical grouping** of Container App Environments
+- **Easy maintenance** - each file focuses on specific environments
+- **Parallel deployment** - different teams can work on different environment files
+- **Reduced conflicts** - smaller, focused files reduce merge conflicts
+
+### 7. Verify the Results
 
 Check the GitHub environments in your application repository and the federated credentials in Azure.
 
@@ -183,23 +308,56 @@ This module is specifically focused on setting up the connection between GitHub 
 - Azure subscription with contributor rights
 - Terraform >= 1.3.0
 
-## Understanding Environment Types
+## Understanding Environment Types in Stratus
 
-This module works with two distinct types of environments:
+This module works with **three distinct layers** of environments in the Stratus architecture:
 
-1. **Azure Infrastructure Environments** (specified by `tfvars_file`):
-   - Represent physical Azure environments like dev, test, or production
-   - Each has its own subscription, resource group, and Container App Environment
-   - Defined by Terraform variables in tfvars files (e.g., `dev.tfvars`, `prod.tfvars`)
-   - Usually correspond to isolated Azure subscriptions or resource groups
+### 1. **Stratus Landing Zone (Subscription Level)**
+   - **What it is**: A complete Azure subscription created by the Stratus Landing Zone vending process
+   - **Naming**: Combination of `code_name` + `environment` (e.g., "myapp-dev", "myapp-prod")
+   - **Scope**: One subscription per Stratus Landing Zone
+   - **Contains**: Multiple Azure Container App Environments, shared resources (ACR, DNS zones, etc.)
+   - **Provisioning**: Can be provisioned with multiple Container App Environments during infrastructure deployment
+   - **Defined by**: Your tfvars file (e.g., `dev.tfvars`, `prod.tfvars`)
 
-2. **GitHub Deployment Environments** (defined in `github_env_file`):
-   - Logical environments within GitHub for deployment workflows
-   - Can be more numerous and granular than Azure environments
-   - Define approval processes, branch policies, and deployment protections
-   - Each gets its own managed identity and federated credentials
+### 2. **Azure Container App Environments (Application Level)**
+   - **What it is**: Specific Container App Environments within a Stratus Landing Zone subscription
+   - **Purpose**: Logical separation of different applications or deployment stages within the same subscription
+   - **Examples**: 
+     - `ace1` - For first Container App Environment with independent scaling
+     - `ace2` - For second Container App Environment with independent scaling
+     - `background-jobs` - For batch processing and scheduled tasks
+       - **Mapping**: The `container_environment` property in your YAML maps to these
+   - **Flexibility**: One Stratus LZ can host multiple Container App Environments
 
-These environments can have a one-to-one relationship, but often you'll have multiple GitHub deployment environments targeting the same Azure infrastructure (e.g., dev-plan, dev-apply, staging-plan, staging-apply all working with dev and staging Azure environments).
+### 3. **GitHub Deployment Environments (Workflow Level)**
+   - **What it is**: GitHub environments that define deployment workflows and security policies
+   - **Purpose**: Control who can deploy, when, and with what approvals
+   - **Examples**: `api-dev-plan`, `api-dev-apply`, `frontend-prod-apply`
+   - **Mapping**: Each GitHub environment targets a specific Azure Container App Environment
+   - **Security**: Each gets its own managed identity and federated credentials
+
+### Environment Relationship Example
+
+```
+Stratus Landing Zone: "ecommerce-dev" (Azure Subscription)
+├── Azure Container App Environment: "ace1"
+│   ├── GitHub Environment: "ace1-dev-plan" (read-only)
+│   └── GitHub Environment: "ace1-dev-apply" (deployment)
+├── Azure Container App Environment: "ace2" 
+│   ├── GitHub Environment: "ace2-dev-plan"
+│   └── GitHub Environment: "ace2-dev-apply"
+└── Azure Container App Environment: "background-jobs"
+    ├── GitHub Environment: "background-jobs-plan"
+    └── GitHub Environment: "background-jobs-apply"
+```
+
+**Key Benefits of This Architecture**:
+- **Cost Optimization**: Multiple applications share the same Stratus Landing Zone subscription
+- **Workload Isolation**: Each Container App Environment has independent scaling and resource allocation (consumption workload profiles)
+- **Performance Independence**: ACE1 load and scaling doesn't affect ACE2 performance or resource availability
+- **Flexible Deployment**: Different GitHub environments with different approval processes for each Container App Environment
+- **Scalable**: Add new applications without creating new subscriptions
 
 **Why More GitHub Environments Than Azure Environments?**
 
@@ -231,60 +389,83 @@ This approach lets you implement sophisticated deployment controls without dupli
 
 For example, your organization might use a single Azure subscription with one Container App Environment for both development and testing activities, but have separate GitHub environments with different branch policies, approval requirements, and team permissions controlling access to those resources.
 
-### Environment Mapping Visualization
+### Stratus Environment Architecture Visualization
 
 ```mermaid
-flowchart LR
-    %% Define Azure environments
-    AzureDev["Azure Dev Environment<br>Subscription A"]
-    AzureProd["Azure Prod Environment<br>Subscription B"]
-    style AzureDev fill:#d0e8ff,stroke:#0078d4,color:#0078d4
-    style AzureProd fill:#d0e8ff,stroke:#0078d4,color:#0078d4
-
-    %% Define GitHub environments 
-    GHDev["GitHub Dev Environment<br>(Frontend & Backend)"]
-    GHTest["GitHub Test Environment<br>(Frontend & Backend)"]
-    GHProd["GitHub Prod Environment<br>(Frontend & Backend)"]
+flowchart TB
+    %% Stratus Landing Zones (Subscriptions)
+    subgraph StratusDevLZ["Stratus Landing Zone: ecommerce-dev (Azure Subscription)"]
+        DevACE1["Container App Environment: ace1<br>(Consumption Profile)"]
+        DevACE2["Container App Environment: ace2<br>(Consumption Profile)"] 
+        DevACE3["Container App Environment: background-jobs<br>(Consumption Profile)"]
+        DevShared["Shared Resources<br>(ACR, DNS, Storage)"]
+    end
     
-    %% Style GitHub environments
-    style GHDev fill:#e8f5e9,stroke:#2e7d32,color:#2e7d32
-    style GHTest fill:#e8f5e9,stroke:#2e7d32,color:#2e7d32
-    style GHProd fill:#e8f5e9,stroke:#2e7d32,color:#2e7d32
+    subgraph StratusProdLZ["Stratus Landing Zone: ecommerce-prod (Azure Subscription)"]
+        ProdACE1["Container App Environment: ace1<br>(Consumption Profile)"]
+        ProdACE2["Container App Environment: ace2<br>(Consumption Profile)"]
+        ProdShared["Shared Resources<br>(ACR, DNS, Storage)"]
+    end
     
-    %% Define operations
-    PlanOp["Plan Operation<br>(Read-only)"]
-    ApplyOp["Apply Operation<br>(Deployment)"]
-    style PlanOp fill:#fff9c4,stroke:#fbc02d,color:#3e2723
-    style ApplyOp fill:#ffccbc,stroke:#e64a19,color:#3e2723
+    %% GitHub Environments
+    subgraph GitHubEnvs["GitHub Environments (Deployment Workflows)"]
+        GH1["ace1-dev-plan"]
+        GH2["ace1-dev-apply"] 
+        GH3["ace2-dev-plan"]
+        GH4["ace2-dev-apply"]
+        GH5["background-jobs-dev-apply"]
+        GH6["ace1-prod-apply"]
+        GH7["ace2-prod-apply"]
+    end
     
-    %% Connection lines
-    GHDev --> PlanOp -.-> AzureDev
-    GHDev --> ApplyOp --> AzureDev
+    %% Styling
+    style StratusDevLZ fill:#d0e8ff,stroke:#0078d4,color:#0078d4
+    style StratusProdLZ fill:#d0e8ff,stroke:#0078d4,color:#0078d4
+    style GitHubEnvs fill:#e8f5e9,stroke:#2e7d32,color:#2e7d32
     
-    GHTest --> PlanOp -.-> AzureDev
+    %% Connections
+    GH1 -.-> DevACE1
+    GH2 --> DevACE1
+    GH3 -.-> DevACE2
+    GH4 --> DevACE2
+    GH5 --> DevACE3
+    GH6 --> ProdACE1
+    GH7 --> ProdACE2
     
-    GHProd --> PlanOp -.-> AzureProd  
-    GHProd --> ApplyOp --> AzureProd
+    %% Legend
+    subgraph Legend["Legend"]
+        L1["Solid Line = Apply (Deployment)"]
+        L2["Dotted Line = Plan (Read-only)"]
+    end
+    style Legend fill:#f9f9f9,stroke:#666,color:#333
 ```
 
-**Understanding Plan and Apply Operations:**
-- Each GitHub environment supports **both plan and apply operations**
-- **Plan operations** (yellow) are read-only, preview-only actions that show what would change
-- **Apply operations** (orange) are actual deployments that make changes to Azure resources
-- The same GitHub environment can perform both operations, with different approval requirements for each
+**Understanding the Stratus Architecture:**
 
-**GitHub Environment Access Controls:**
-- Dev environments often allow plans with no approvals, but require approvals for apply operations
-- Test environments usually perform read-only operations against dev infrastructure 
-- Prod environments typically require strict approval processes for both plan and apply operations
-- A single GitHub environment can be configured with different protection rules for different operations
+**Stratus Landing Zones (Blue Boxes)**:
+- Each Stratus Landing Zone is a complete Azure subscription
+- Contains multiple Container App Environments for different applications/tiers
+- Includes shared resources (ACR, DNS zones, storage) used by all applications
+- Named using `code_name` + `environment` pattern (e.g., "myapp-dev", "myapp-prod")
 
-**Key points about environment relationships:**
-* GitHub environments (green) define the security boundaries and approval processes
-* Operations (plan/apply) define what actions can be taken within those environments
-* Multiple GitHub environments from different repos can target the same Azure infrastructure
-* Azure environments (blue) are the actual infrastructure that operations act upon
-* The separation of environments from operations provides a flexible security model
+**Container App Environments (Within Landing Zones)**:
+- Logical separation within a subscription for different applications or stages
+- Examples: `api`, `frontend`, `staging`, `integration`
+- Each can host multiple container applications
+- Mapped to via the `container_environment` property in your YAML
+
+**GitHub Environments (Green Box)**:
+- Define deployment workflows, approvals, and security policies
+- Each targets a specific Container App Environment
+- Can be plan-only (dotted lines) or deployment-enabled (solid lines)
+- Multiple GitHub environments can target the same Container App Environment
+
+**Key Benefits of This Stratus Model**:
+- **Cost Efficiency**: Multiple applications share subscription-level resources
+- **Logical Separation**: Clear boundaries between different application tiers
+- **Flexible Security**: Different approval processes for the same target infrastructure
+- **Scalable Growth**: Add new applications without creating new subscriptions
+- **Operational Simplicity**: Centralized management of shared resources (ACR, DNS, etc.)
 
 ## How This Module Fits in the Stratus Workflow
 
@@ -371,7 +552,7 @@ The `github-envrionments.yaml` file defines GitHub deployment environments for y
 repositories:
   - repo: "repository-name"  # GitHub repository name
     environments:
-      - name: "environment-name"  # GitHub Environment name (e.g., dev, staging, prod)
+      - name: "environment-name"  # GitHub Environment name (e.g., internet-gateway-dev, internal-services-prod)
         # Environment settings follow
 ```
 
@@ -380,6 +561,7 @@ repositories:
 | Property | Type | Description | Default | Required |
 |----------|------|-------------|---------|----------|
 | `name` | string | Name of the GitHub deployment environment | - | Yes |
+| `container_environment` | string | Maps to Container App Environment key in remote state | "default" | No |
 | `wait_timer` | integer | Wait time (minutes) before allowing deployments | 0 | No |
 | `prevent_self_review` | boolean | Prevents people from approving their own deployments | false | No |
 | `reviewers` | object | Users and teams who must approve deployments | null | No |
@@ -387,6 +569,86 @@ repositories:
 | `deployment_tag_policy` | object | Tag-based deployment rules | null | No |
 | `variables` | object | Environment variables to create | {} | No |
 | `secrets` | array | Secrets to create | [] | No |
+
+### Container App Environment Mapping in Stratus
+
+The `container_environment` property maps your GitHub environments to specific **Azure Container App Environments** within your Stratus Landing Zone. This enables flexible deployment patterns within a single subscription:
+
+```yaml
+# Example: Stratus Landing Zone "ecommerce-dev" contains multiple Container App Environments
+repositories:
+  - repo: my-web-frontend
+    environments:
+      - name: ace1-dev-plan
+        container_environment: ace1    # Maps to "ace1" Container App Environment
+      - name: ace1-dev-apply
+        container_environment: ace1    # Same Container App Environment, different protections
+  
+  - repo: my-user-service
+    environments:
+      - name: ace2-dev-plan
+        container_environment: ace2   # Maps to "ace2" Container App Environment
+      - name: ace2-dev-apply
+        container_environment: ace2   # Same Container App Environment
+  
+  - repo: my-data-processor
+    environments:
+      - name: background-jobs-dev-apply
+        container_environment: background-jobs     # Maps to "background-jobs" Container App Environment
+```
+
+**Real-World Stratus Example**:
+```
+Stratus Landing Zone: "ecommerce-dev" (Subscription)
+├── Container App Environment: "ace1" (Consumption workload profile)
+│   └── GitHub Environments: ace1-dev-plan, ace1-dev-apply
+│   └── Services: web-frontend, api-gateway (independent scaling)
+├── Container App Environment: "ace2" (Consumption workload profile)
+│   └── GitHub Environments: ace2-dev-plan, ace2-dev-apply  
+│   └── Services: user-service, inventory-service (independent scaling)
+└── Container App Environment: "background-jobs" (Consumption workload profile)
+    └── GitHub Environments: background-jobs-dev-apply
+    └── Services: analytics-engine, report-generator (batch processing)
+```
+
+**Benefits of this Stratus approach**:
+- **Cost optimization**: Multiple applications share the same Stratus Landing Zone subscription
+- **Workload isolation**: Different Container App Environments with consumption workload profiles for independent scaling
+- **Performance independence**: ACE1 traffic spikes don't impact ACE2 performance or resource availability
+- **Resource efficiency**: Each Container App Environment scales independently based on its own demand patterns
+- **Flexible deployment**: Different GitHub approval processes for each Container App Environment workload
+- **Scalable architecture**: Add new applications without creating new subscriptions
+
+### Settings Override Behavior
+
+When both remote state and YAML provide settings for the same environment, the precedence is:
+
+**Remote State → YAML (YAML wins)**
+
+This allows the remote state to provide sensible defaults while giving YAML the final say:
+
+```yaml
+# Remote state provides defaults:
+# settings = {
+#   wait_timer = 5
+#   reviewers = { users = ["platform-team"] }
+# }
+
+repositories:
+  - repo: my-app
+    environments:
+      - name: dev
+        azure_environment: prod  # Uses prod Azure environment
+        wait_timer: 0           # Overrides remote state's wait_timer = 5
+        reviewers:              # Overrides remote state's reviewers
+          users: ["dev-team"]
+        # prevent_self_review not specified, uses remote state default
+```
+
+This pattern ensures that:
+- **Remote state** can enforce organization-wide policies and defaults
+- **YAML** retains flexibility for team-specific requirements
+- **Consistency** is maintained across environments while allowing customization
 
 > **Note**: Each GitHub environment defined here will get its own Azure User-Assigned Managed Identity and federated credential. This allows for granular access control and deployment permissions targeting the same underlying Azure resources.
 
@@ -487,25 +749,141 @@ This module works around these limitations as much as possible, but some combina
 
 The module automatically provides essential Azure infrastructure variables for all environments, plus you can define additional custom variables and secrets:
 
-#### Automatically Provided Azure Variables
+#### Environment Variables from Remote State
 
-**The module automatically injects these variables into every GitHub environment** (no manual configuration required):
+**The module gets environment variables from the remote state output `github_environment_config.variables`**:
 
-| Variable Name | Description | Source |
-|---------------|-------------|---------|
-| `AZURE_CLIENT_ID` | Managed identity client ID (unique per environment) | Per-environment managed identity |
-| `AZURE_TENANT_ID` | Azure tenant ID | Current Azure client config |
-| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID | Current Azure client config |
-| `ACR_NAME` | Container registry name | Remote state from infrastructure deployment |
-| `CONTAINER_APP_ENVIRONMENT_ID` | Target environment for deployments | Remote state from infrastructure deployment |
-| `CONTAINER_APP_ENVIRONMENT_CLIENT_ID` | Client ID for ACR authentication | Per-environment managed identity |
-| `PRIVATE_DNS_ZONE_NAME` | Private DNS zone name for creating CNAME records | Remote state from infrastructure deployment |
-| `PUBLIC_DNS_ZONE_NAME` | Public DNS zone name for creating DNS records for internet-accessible apps | Remote state from infrastructure deployment |
-| `BACKEND_AZURE_RESOURCE_GROUP_NAME` | Resource group for Terraform state | Module configuration |
-| `BACKEND_AZURE_STORAGE_ACCOUNT_NAME` | Storage account for Terraform state | Module configuration |
-| `BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME` | Container for state files | Module configuration |
+The upstream infrastructure module should output a `github_environment_config` structure like this:
 
-> **Key Benefits**: These variables provide everything needed for Azure OIDC authentication, container operations, and CI/CD state access without any manual configuration.
+```hcl
+output "github_environment_config" {
+  value = {
+    # Map of Azure Container App Environments
+    environments = {
+      "dev" = {
+        variables = {
+          AZURE_TENANT_ID                              = data.azurerm_client_config.current.tenant_id
+          AZURE_SUBSCRIPTION_ID                        = data.azurerm_client_config.current.subscription_id
+          ACR_NAME                                      = azurerm_container_registry.main.name
+          CONTAINER_APP_ENVIRONMENT_ID                 = azurerm_container_app_environment.dev.id
+          PRIVATE_DNS_ZONE_NAME                        = azurerm_private_dns_zone.dev.name
+          PUBLIC_DNS_ZONE_NAME                         = azurerm_dns_zone.main.name
+          BACKEND_AZURE_RESOURCE_GROUP_NAME            = "dev-state-rg"
+          BACKEND_AZURE_STORAGE_ACCOUNT_NAME           = "devstateaccount"
+          BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME = "tfstate"
+          # ... other dev-specific variables
+        }
+        secrets = {
+          DATABASE_CONNECTION_STRING = "Server=dev-db..."
+          API_KEY                   = "dev-api-key"
+        }
+        settings = {
+          # Optional: Default GitHub environment settings for this Azure environment
+          wait_timer = 0
+          prevent_self_review = false
+          reviewers = {
+            users = ["dev-team-lead"]
+            teams = ["developers"]
+          }
+          deployment_branch_policy = {
+            protected_branches = false
+            custom_branch_policies = true
+            custom_branches = ["main", "develop"]
+          }
+        }
+        role_assignments = {
+          global = [
+            {
+              scope = azurerm_container_app_environment.dev.id
+              role  = "Reader"
+            }
+          ]
+          plan = [
+            {
+              scope = azurerm_storage_account.dev_tfstate.id
+              role  = "Storage Blob Data Reader"
+            }
+          ]
+          apply = [
+            {
+              scope = azurerm_container_registry.main.id
+              role  = "AcrPush"
+            },
+            {
+              scope = azurerm_container_app_environment.dev.id
+              role  = "Container Apps Contributor"
+            }
+          ]
+        }
+      }
+      "prod" = {
+        variables = {
+          AZURE_TENANT_ID                              = data.azurerm_client_config.current.tenant_id
+          AZURE_SUBSCRIPTION_ID                        = data.azurerm_client_config.current.subscription_id
+          ACR_NAME                                      = azurerm_container_registry.main.name
+          CONTAINER_APP_ENVIRONMENT_ID                 = azurerm_container_app_environment.prod.id
+          PRIVATE_DNS_ZONE_NAME                        = azurerm_private_dns_zone.prod.name
+          PUBLIC_DNS_ZONE_NAME                         = azurerm_dns_zone.main.name
+          BACKEND_AZURE_RESOURCE_GROUP_NAME            = "prod-state-rg"
+          BACKEND_AZURE_STORAGE_ACCOUNT_NAME           = "prodstateaccount"
+          BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME = "tfstate"
+          # ... other prod-specific variables
+        }
+        secrets = {
+          DATABASE_CONNECTION_STRING = "Server=prod-db..."
+          API_KEY                   = "prod-api-key"
+        }
+        settings = {
+          # Stricter settings for production
+          wait_timer = 5
+          prevent_self_review = true
+          reviewers = {
+            users = ["prod-admin"]
+            teams = ["platform-team"]
+          }
+          deployment_tag_policy = {
+            enabled = true
+            tag_patterns = ["v*"]
+          }
+        }
+        role_assignments = {
+          global = [
+            {
+              scope = azurerm_container_app_environment.prod.id
+              role  = "Reader"
+            }
+          ]
+          plan = [
+            {
+              scope = azurerm_storage_account.prod_tfstate.id
+              role  = "Storage Blob Data Reader"
+            }
+          ]
+          apply = [
+            {
+              scope = azurerm_container_registry.main.id
+              role  = "AcrPush"
+            },
+            {
+              scope = azurerm_container_app_environment.prod.id
+              role  = "Container Apps Contributor"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+**Variable Sources and Precedence**:
+1. **Remote state variables** (from `github_environment_config.variables`) - Base variables
+2. **Per-environment managed identity variables** - Added automatically:
+   - `AZURE_CLIENT_ID` (unique per environment)
+   - `CONTAINER_APP_ENVIRONMENT_CLIENT_ID` (unique per environment)
+3. **YAML configuration variables** - Highest precedence (can override any of the above)
+
+> **Key Benefits**: This approach centralizes variable management in the infrastructure layer while maintaining flexibility for environment-specific overrides.
 
 #### Custom Variables and Secrets (Optional)
 
@@ -515,7 +893,7 @@ You can define additional custom variables and secrets for each environment in y
 variables:
   API_URL: "https://api.example.com"
   DEBUG_MODE: "false"
-  # Custom variables are merged with automatic Azure variables
+  # Custom variables are merged with remote state and managed identity variables
   # Custom variables take precedence if names conflict
 
 secrets:
@@ -525,13 +903,13 @@ secrets:
     value: "another-secret-value"
 ```
 
-**Variable Precedence**: Custom variables override automatic Azure variables if there are naming conflicts.
+**Variable Precedence**: Remote State → Per-Environment → YAML (highest precedence)
 
-**Note**: This version of the module only supports static secrets defined directly in the YAML file. 
+**Secret Sources**: Secrets can come from both remote state (`github_environment_config.secrets`) and YAML configuration. Both sources are combined, with YAML secrets taking precedence if there are naming conflicts.
 
 > **Important**: Container App deployments using Azure OIDC federation typically don't need GitHub Environment secrets for Azure authentication since all Azure variables are automatically provided. Use secrets for build steps or third-party services only.
 
-Future versions will support secret substitution from GitHub workflow environment variables, GitHub secrets, and references to Azure Key Vault for even greater security and flexibility in production environments.
+> **Security Note**: For production environments, consider using Azure Key Vault references in your remote state output instead of hardcoding sensitive values.
 
 ## Azure Resources Created
 
@@ -547,54 +925,76 @@ For each environment, the following Azure resources are created:
    - Subject format: `repo:{owner}/{repo}:environment:{environment}`
    - Enables passwordless authentication from GitHub to Azure
 
-3. **Role Assignments** (implements least-privilege access):
+3. **Role Assignments** (flexible, defined by remote state):
 
-   **Plan Environments** (environments ending with `-plan`):
-   - **Reader**: Read-only access to Container App Environment for planning
-   - **Storage Blob Data Reader**: Read-only access to Terraform state for planning
+   Role assignments are defined in the remote state `github_environment_config.role_assignments`:
 
-   **Apply Environments** (all other environments):
-   - **AcrPush**: Allows pushing container images to Azure Container Registry
-   - **Container Apps Contributor**: Allows deploying to Azure Container Apps
-   - **Container Apps Jobs Contributor**: Allows deploying jobs to Container Apps
-   - **Reader**: Read access to Container App Environment
-   - **Storage Blob Data Contributor**: Read/write access to Terraform state for CI/CD
-   
-   **ACE Storage Account** (if available, apply environments only):
-   - **Storage Blob Data Contributor**: Access to blob storage for application data
-   - **Storage File Data SMB Share Contributor**: Access to file shares for persistent storage
-   - **Storage Queue Data Contributor**: Access to storage queues for Dapr components
-   - **Storage Table Data Contributor**: Access to storage tables for Dapr components
+   ```hcl
+   role_assignments = {
+     # Roles applied to ALL environments (both plan and apply)
+     global = [
+       {
+         scope = azurerm_container_app_environment.main.id
+         role  = "Reader"
+       }
+     ]
+     # Roles applied ONLY to plan environments (ending with '-plan')
+     plan = [
+       {
+         scope = azurerm_storage_account.tfstate.id
+         role  = "Storage Blob Data Reader"
+       }
+     ]
+     # Roles applied ONLY to apply environments (NOT ending with '-plan')
+     apply = [
+       {
+         scope = azurerm_container_registry.main.id
+         role  = "AcrPush"
+       },
+       {
+         scope = azurerm_container_app_environment.main.id
+         role  = "Container Apps Contributor"
+       },
+       # ... additional roles as needed
+     ]
+   }
+   ```
 
-   **Private DNS Zone** (if available, apply environments only):
-   - **DNS Zone Contributor**: Allows creating CNAME records for container apps with custom domains
+   **Benefits of This Approach**:
+   - **Centralized permission management**: All permissions defined in infrastructure layer
+   - **Environment-specific roles**: Different permissions for plan vs apply environments  
+   - **Flexible scopes**: Can target any Azure resource with any built-in or custom role
+   - **No hardcoded logic**: Module doesn't need to know about specific Azure resources
 
-   **Public DNS Zone** (if available, apply environments only):
-   - **DNS Zone Contributor**: Allows creating DNS records for internet-accessible container apps via Application Gateway
-
-> **Security Note**: Plan environments receive read-only permissions to support Terraform planning operations without allowing actual deployments or state modifications. Apply environments receive full deployment permissions including automatic access to ACE storage for persistent storage, file shares, and Dapr components when available, plus DNS zone access for automated DNS record creation (both private and public zones). This separation follows the principle of least privilege.
+> **Security Note**: This approach maintains the principle of least privilege while providing complete flexibility. Plan environments typically get read-only permissions, while apply environments get deployment permissions. The upstream infrastructure defines exactly what each environment can access.
 
 ## GitHub Action Integration
 
 Once this module has been applied, your GitHub workflows can use the automatically configured environments and federated credentials to deploy to Azure Container Apps.
 
-**The module automatically configures these environment variables** for use in GitHub Actions (no manual setup required):
+**Environment variables are provided from multiple sources**:
+
+1. **Remote State Variables**: Defined in the upstream infrastructure's `github_environment_config.variables` output
+2. **Per-Environment Variables**: Automatically added by the module:
+   - `AZURE_CLIENT_ID` - Unique managed identity client ID for each environment
+   - `CONTAINER_APP_ENVIRONMENT_CLIENT_ID` - Same as AZURE_CLIENT_ID for ACR authentication
+3. **YAML Variables**: Optional custom variables defined in your environment configuration
+
+**Common variables typically provided by remote state**:
 
 | Variable | Description | Usage |
 |----------|-------------|-------|
-| `AZURE_CLIENT_ID` | The managed identity client ID for GitHub OIDC federation | Azure authentication |
 | `AZURE_TENANT_ID` | The Azure tenant ID | Azure authentication |
 | `AZURE_SUBSCRIPTION_ID` | The Azure subscription ID | Azure authentication |
 | `ACR_NAME` | Container registry name | Image operations |
 | `CONTAINER_APP_ENVIRONMENT_ID` | Target environment for deployments | Container app deployments |
-| `CONTAINER_APP_ENVIRONMENT_CLIENT_ID` | Client ID of the managed identity for ACR authentication | ACR operations |
 | `PRIVATE_DNS_ZONE_NAME` | Private DNS zone name for creating CNAME records | DNS record creation |
 | `PUBLIC_DNS_ZONE_NAME` | Public DNS zone name for creating DNS records for internet-accessible apps | Public DNS record creation |
 | `BACKEND_AZURE_RESOURCE_GROUP_NAME` | Resource group for Terraform state | CI/CD state access |
 | `BACKEND_AZURE_STORAGE_ACCOUNT_NAME` | Storage account for Terraform state | CI/CD state access |
 | `BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME` | Container for state files | CI/CD state access |
 
-> **Ready to Use**: These variables are automatically available in your GitHub Actions workflows immediately after running this module. No additional configuration needed!
+> **Ready to Use**: Variables from remote state and per-environment identities are automatically available in your GitHub Actions workflows. The exact variables available depend on what your upstream infrastructure provides in the `github_environment_config` output.
 
 ### Example Workflow for Container App Deployment
 
@@ -779,6 +1179,8 @@ If you encounter persistent errors with specific environments, consider these wo
 
 These issues appear to be related to GitHub's API implementation, not with the module itself.
 
+
+
 ## Variables
 
 | Name | Description | Type | Default | Required |
@@ -788,7 +1190,7 @@ These issues appear to be related to GitHub's API implementation, not with the m
 | `github_token` | GitHub token for API access | `string` | n/a | yes |
 | `github_owner` | GitHub organization or user name | `string` | `HafslundEcoVannkraft` | no |
 | `location` | Azure region for resources | `string` | n/a | yes |
-| `github_env_file` | Filename of GitHub environments configuration file | `string` | `"github-envrionments.yaml"` | no |
+| `github_env_file` | Filename of GitHub environments configuration file | `string` | `"github-environments.yaml"` | no |
 | `state_storage_account_name` | Storage account for Terraform state | `string` | n/a | yes |
 
 ## Notes for Single Organization Support

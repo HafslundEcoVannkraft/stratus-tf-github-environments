@@ -36,32 +36,67 @@ locals {
   # Contains references to ACR, Container App Environment, and other shared resources
   remote_state_outputs = try(data.terraform_remote_state.container_app_environment.outputs, {})
 
-  # Azure Container App Environment ID where applications will be deployed
-  # Retrieved from remote state to ensure consistency across deployments
+
+
+  # =============================================================================
+  # ROLE ASSIGNMENTS PROCESSING
+  # =============================================================================
+
+  # Create flattened role assignment objects for all environments
+  # This combines global roles with environment-specific roles based on environment type
+  # Role assignments come from the Azure environment-specific configuration
+  environment_role_assignments = flatten([
+    for env in local.environments : 
+      concat(
+        # Global roles (apply to all environments)
+        [
+          for role in try(local.github_environment_config.environments[env.container_environment].role_assignments.global, []) : {
+            key                   = "${env.key}-global-${role.role}"
+            environment_key       = env.key
+            container_environment = env.container_environment
+            environment_type      = endswith(env.environment, "-plan") ? "plan" : "apply"
+            managed_identity_id   = module.managed_identity_app_repositories[env.key].principal_id
+            scope                 = role.scope
+            role_definition_name  = role.role
+          }
+        ],
+        # Environment-specific roles (plan or apply)
+        [
+          for role in try(
+            endswith(env.environment, "-plan") ? 
+              local.github_environment_config.environments[env.container_environment].role_assignments.plan :
+              local.github_environment_config.environments[env.container_environment].role_assignments.apply,
+            []
+          ) : {
+            key                   = "${env.key}-${endswith(env.environment, "-plan") ? "plan" : "apply"}-${role.role}"
+            environment_key       = env.key
+            container_environment = env.container_environment
+            environment_type      = endswith(env.environment, "-plan") ? "plan" : "apply"
+            managed_identity_id   = module.managed_identity_app_repositories[env.key].principal_id
+            scope                 = role.scope
+            role_definition_name  = role.role
+          }
+        ]
+      )
+  ])
+
+  # Map role assignments by their unique keys for resource creation
+  role_assignments_map = {
+    for assignment in local.environment_role_assignments :
+    assignment.key => assignment
+  }
+
+  # Legacy remote state references - kept for backward compatibility with existing role assignments
+  # These will be removed once all role assignment logic is updated to use the new convention
   container_app_environment_id = try(local.remote_state_outputs.container_app_environment_id, "")
-
-  # Azure Container Registry name for container image storage
-  # Used for role assignments to allow GitHub Actions to push images
-  acr_name = try(local.remote_state_outputs.acr_name, "")
-
-  # Azure Container Registry resource ID for RBAC assignments
-  # Full ARM resource path needed for role assignment scope
-  acr_resource_id = try(local.remote_state_outputs.acr_resource_id, "")
-
-  # Azure Container App Environment Storage Account for persistent storage
-  # Used by container apps for file shares, Dapr components, and application data
-  ace_storage_account_id   = try(local.remote_state_outputs.ace_storage_account_id, "")
-  ace_storage_account_name = try(local.remote_state_outputs.ace_storage_account_name, "")
-
-  # Private DNS Zone for creating CNAME records for container apps
-  # Enables custom domain names and automated DNS record creation during deployments
-  private_dns_zone_id   = try(local.remote_state_outputs.private_dns_zone_id, "")
-  private_dns_zone_name = try(local.remote_state_outputs.private_dns_zone_name, "")
-
-  # Public DNS Zone for creating DNS records for internet-accessible container apps
-  # Used with Application Gateway for public-facing applications
-  public_dns_zone_id   = try(local.remote_state_outputs.public_dns_zone_id, "")
-  public_dns_zone_name = try(local.remote_state_outputs.public_dns_zone_name, "")
+  acr_name                     = try(local.remote_state_outputs.acr_name, "")
+  acr_resource_id              = try(local.remote_state_outputs.acr_resource_id, "")
+  ace_storage_account_id       = try(local.remote_state_outputs.ace_storage_account_id, "")
+  ace_storage_account_name     = try(local.remote_state_outputs.ace_storage_account_name, "")
+  private_dns_zone_id          = try(local.remote_state_outputs.private_dns_zone_id, "")
+  private_dns_zone_name        = try(local.remote_state_outputs.private_dns_zone_name, "")
+  public_dns_zone_id           = try(local.remote_state_outputs.public_dns_zone_id, "")
+  public_dns_zone_name         = try(local.remote_state_outputs.public_dns_zone_name, "")
 
   # =============================================================================
   # ENVIRONMENT PROCESSING AND FLATTENING
@@ -125,21 +160,35 @@ locals {
         environment        = env.name                        # Environment name (dev, staging, prod, etc.)
         key                = "${repo.repo}:${env.name}"      # Standard GitHub format (colon-separated)
         azure_resource_key = "${repo.repo}-${env.name}"      # Azure-compatible format (only for resource naming)
+        container_environment = try(env.container_environment, "default") # Maps to remote state environments key
         prevent_destroy    = try(env.prevent_destroy, false) # Lifecycle protection setting
 
+        # Get remote state configuration for this Container App Environment
+        container_env_key = try(env.container_environment, "default")
+        remote_config = try(local.github_environment_config.environments[container_env_key], {
+          variables        = {}
+          secrets          = {}
+          settings         = {}
+          role_assignments = { global = [], plan = [], apply = [] }
+        })
+
+        # Settings with precedence: Remote State → YAML (YAML wins)
+        wait_timer          = try(env.wait_timer, try(remote_config.settings.wait_timer, 0))
+        prevent_self_review = try(env.prevent_self_review, try(remote_config.settings.prevent_self_review, false))
+        
         # Reviewer configuration for deployment approvals
-        reviewers = {
-          users = try(env.reviewers.users, []) # GitHub users who can approve deployments
-          teams = try(env.reviewers.teams, []) # GitHub teams who can approve deployments
-        }
+        reviewers = try(env.reviewers, try(remote_config.settings.reviewers, {
+          users = [] # Default empty if nothing specified
+          teams = []
+        }))
 
         # Branch and tag deployment policies
-        branch_policy = try(env.deployment_branch_policy, null) # Which branches can deploy
-        tag_policy    = try(env.deployment_tag_policy, null)    # Which tags can deploy
+        branch_policy = try(env.deployment_branch_policy, try(remote_config.settings.deployment_branch_policy, null))
+        tag_policy    = try(env.deployment_tag_policy, try(remote_config.settings.deployment_tag_policy, null))
 
         # Environment-specific configuration
-        variables = try(env.variables, {}) # Environment variables to set
-        secrets   = try(env.secrets, [])   # Secrets to create
+        variables = try(env.variables, {}) # Environment variables to set (YAML only, merged later)
+        secrets   = try(env.secrets, [])   # Secrets to create (YAML only, merged later)
       }
     ]
   ])
@@ -180,57 +229,33 @@ locals {
   # ENVIRONMENT VARIABLES PROCESSING AND AZURE INTEGRATION
   # =============================================================================
 
-  # Define standard Azure infrastructure variables that should be automatically 
-  # available in all GitHub environments. These are derived from remote state
-  # and module configuration to provide seamless Azure integration.
-  # These variables enable GitHub Actions workflows to:
-  # - Authenticate with Azure using OIDC federation
-  # - Access Azure Container Registry for image operations  
-  # - Deploy to Azure Container App Environment
-  # - Access Terraform state for CI/CD operations
-  # - Create DNS records for custom domains
-  standard_azure_variables = {
-    # Azure authentication and subscription details
-    AZURE_TENANT_ID       = data.azurerm_client_config.current.tenant_id
-    AZURE_SUBSCRIPTION_ID = data.azurerm_client_config.current.subscription_id
-
-    # Azure Container Registry details for image operations
-    ACR_NAME = local.acr_name
-
-    # Azure Container App Environment for deployments
-    CONTAINER_APP_ENVIRONMENT_ID = local.container_app_environment_id
-
-    # Private DNS Zone for custom domain DNS records
-    PRIVATE_DNS_ZONE_NAME = local.private_dns_zone_name
-
-    # Public DNS Zone for internet-accessible DNS records (via Application Gateway)
-    PUBLIC_DNS_ZONE_NAME = local.public_dns_zone_name
-
-    # Terraform backend configuration for CI/CD state access
-    BACKEND_AZURE_RESOURCE_GROUP_NAME            = local.terraform_backend.resource_group_name
-    BACKEND_AZURE_STORAGE_ACCOUNT_NAME           = local.terraform_backend.storage_account_name
-    BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME = local.terraform_backend.container_name
-  }
+  # GitHub environment configuration from remote state
+  # The remote state should output github_environment_config with environments map
+  # Each environment can have its own variables, secrets, role assignments, and settings
+  github_environment_config = try(local.remote_state_outputs.github_environment_config, {
+    environments = {}
+  })
 
   # Create a comprehensive map of environment variables for each environment
-  # This automatically provides a complete set of Azure integration variables:
-  # 1. Standard Azure variables (same for all environments)
+  # This provides environment variables from multiple sources:
+  # 1. Remote state variables (from Azure environment-specific configuration)
   # 2. Per-environment managed identity variables (unique per environment)  
   # 3. Manual variables from YAML configuration (user-defined)
   # 
-  # Variable precedence (last wins): Standard -> Per-Environment -> Manual
+  # Variable precedence (last wins): Remote State -> Per-Environment -> Manual
   # This allows users to override any automatically generated variable if needed
   environment_variables = {
     for env in local.environments :
     env.key => merge(
-      local.standard_azure_variables, # Standard Azure variables (applied to all environments)
+      # Get variables from the specific Container App Environment configuration
+      try(local.github_environment_config.environments[env.container_environment].variables, {}),
       {
         # Per-environment variables derived from the managed identity for this specific environment
         # These provide the unique identity for each environment's GitHub Actions workflows
         AZURE_CLIENT_ID                     = module.managed_identity_app_repositories[env.key].client_id
         CONTAINER_APP_ENVIRONMENT_CLIENT_ID = module.managed_identity_app_repositories[env.key].client_id
       },
-      try(env.variables, {}) # Manual variables from YAML configuration (can override standards)
+      try(env.variables, {}) # From YAML (highest precedence)
     )
   }
 
@@ -241,18 +266,33 @@ locals {
   # Process and flatten secrets from all environments
   # Creates individual secret objects with proper key structure for resource creation
   # Each secret gets its own entry with repository, environment, and secret details
+  # Secrets come from two sources: Azure environment-specific remote state and YAML configuration
   # TODO: Add GitHub Action runtime processing of secret values, we dont want secrets in the yaml files
   environment_secrets = flatten([
-    for env in local.environments : [
-      for secret in try(env.secrets, []) : {
-        key         = "${env.repository}:${env.environment}-${secret.name}" # Unique key for this secret
-        full_key    = "${env.key}-${secret.name}"                           # Resource naming key
-        repository  = env.repository                                        # GitHub repository
-        environment = env.environment                                       # Environment name
-        name        = secret.name                                           # Secret name
-        value       = secret.value                                          # Secret value
-      }
-    ]
+    for env in local.environments : concat(
+      # Secrets from Container App Environment-specific remote state (convert map to list of objects)
+      [
+        for secret_name, secret_value in try(local.github_environment_config.environments[env.container_environment].secrets, {}) : {
+          key         = "${env.repository}:${env.environment}-${secret_name}"
+          full_key    = "${env.key}-${secret_name}"
+          repository  = env.repository
+          environment = env.environment
+          name        = secret_name
+          value       = secret_value
+        }
+      ],
+      # Secrets from YAML (already in correct format)
+      [
+        for secret in try(env.secrets, []) : {
+          key         = "${env.repository}:${env.environment}-${secret.name}" # Unique key for this secret
+          full_key    = "${env.key}-${secret.name}"                           # Resource naming key
+          repository  = env.repository                                        # GitHub repository
+          environment = env.environment                                       # Environment name
+          name        = secret.name                                           # Secret name
+          value       = secret.value                                          # Secret value
+        }
+      ]
+    )
   ])
 
   # Map secrets by their unique keys for easier resource lookup
@@ -275,4 +315,5 @@ locals {
       if contains([for env in local.environments : "${env.repository}:${env.environment}"], "${repo_name}:${env.name}")
     ]
   ])
+
 }

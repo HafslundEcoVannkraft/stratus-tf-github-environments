@@ -32,6 +32,7 @@ output "github_environments" {
       environments = {
         for env in repo.environments : env.name => {
           name                        = env.name
+          container_environment       = try(env.container_environment, "default")
           managed_by_terraform        = true
           azure_client_id             = module.managed_identity_app_repositories["${repo.repo}:${env.name}"].client_id
           azure_managed_identity_name = module.managed_identity_app_repositories["${repo.repo}:${env.name}"].resource_name
@@ -43,23 +44,43 @@ output "github_environments" {
 }
 
 output "environment_variables_summary" {
-  description = "Summary of automatic Azure variables provided to each environment."
+  description = "Summary of environment variables provided to each environment."
   value = {
-    automatic_variables_count = 11 # 9 standard Azure variables + 2 per-environment variables
-    automatic_variables_provided = [
-      "AZURE_CLIENT_ID (unique per environment)",
-      "AZURE_TENANT_ID",
-      "AZURE_SUBSCRIPTION_ID",
-      "ACR_NAME",
-      "CONTAINER_APP_ENVIRONMENT_ID",
-      "CONTAINER_APP_ENVIRONMENT_CLIENT_ID (unique per environment)",
-      "PRIVATE_DNS_ZONE_NAME",
-      "PUBLIC_DNS_ZONE_NAME",
-      "BACKEND_AZURE_RESOURCE_GROUP_NAME",
-      "BACKEND_AZURE_STORAGE_ACCOUNT_NAME",
-      "BACKEND_AZURE_STORAGE_ACCOUNT_CONTAINER_NAME"
+    variable_sources = [
+      "Container App Environment-specific remote state (github_environment_config.environments[container_environment].variables)",
+      "Per-environment managed identity (AZURE_CLIENT_ID, CONTAINER_APP_ENVIRONMENT_CLIENT_ID)",
+      "YAML configuration (user-defined overrides)"
     ]
-    note = "These variables are automatically available in GitHub Actions workflows for all environments"
+    variable_precedence = "Container App Environment Remote State -> Per-Environment -> YAML (highest precedence)"
+    per_environment_variables = [
+      "AZURE_CLIENT_ID (unique per environment)",
+      "CONTAINER_APP_ENVIRONMENT_CLIENT_ID (unique per environment)"
+    ]
+    container_environment_mapping = {
+      for env in local.environments : env.key => env.container_environment
+    }
+    note = "Variables come from the specific Container App Environment configuration in remote state. Multiple GitHub environments can map to the same Container App Environment."
+  }
+}
+
+output "role_assignments_summary" {
+  description = "Summary of role assignment configuration and sources."
+  value = {
+    role_assignment_sources = [
+      "Container App Environment-specific remote state (github_environment_config.environments[container_environment].role_assignments)"
+    ]
+    remote_state_role_types = [
+      "global - Applied to all environments",
+      "plan - Applied only to environments ending with '-plan'", 
+      "apply - Applied only to environments NOT ending with '-plan'"
+    ]
+    total_assignments = length(local.environment_role_assignments)
+    environments_with_roles = length(distinct([for assignment in local.environment_role_assignments : assignment.environment_key]))
+    container_environments_used = length(distinct([for assignment in local.environment_role_assignments : assignment.container_environment]))
+    container_environment_mapping = {
+      for env in local.environments : env.key => env.container_environment
+    }
+    note = "Role assignments come from the specific Container App Environment configuration in remote state. Multiple GitHub environments can share the same Container App Environment's role assignments."
   }
 }
 
@@ -153,11 +174,12 @@ output "next_steps" {
 }
 
 output "environment_to_identity_mapping" {
-  description = "Quick reference mapping of GitHub environments to their Azure managed identity client IDs."
+  description = "Quick reference mapping of GitHub environments to their Azure managed identity client IDs and target Container App Environments."
   value = [
-    for env in local.flattened_repo_environments : {
-      environment     = env.key
-      azure_client_id = module.managed_identity_app_repositories[env.key].client_id
+    for env in local.environments : {
+      github_environment    = env.key
+      container_environment = env.container_environment
+      azure_client_id       = module.managed_identity_app_repositories[env.key].client_id
     }
   ]
 }
@@ -214,9 +236,11 @@ output "troubleshooting_info" {
 output "raw_configuration" {
   description = "Raw configuration data for advanced troubleshooting (use only if you know what you're doing)."
   value = {
-    parsed_repositories      = local.repositories
-    remote_state_outputs     = local.remote_state_outputs
-    terraform_backend_config = local.terraform_backend
+    parsed_repositories         = local.repositories
+    remote_state_outputs        = local.remote_state_outputs
+    terraform_backend_config    = local.terraform_backend
+    github_environment_config   = local.github_environment_config
+    processed_role_assignments  = local.environment_role_assignments
   }
   sensitive = false
 }
