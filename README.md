@@ -2,6 +2,27 @@
 
 [![Terraform Validation](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/pr-validation.yml)
 [![Dependabot Auto-Merge](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/dependabot-auto-merge.yml/badge.svg)](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/dependabot-auto-merge.yml)
+[![Community Friendly](https://img.shields.io/badge/Community-Friendly-brightgreen?style=flat&logo=github)](./CONTRIBUTING_COMMUNITY.md)
+[![Good First Issues](https://img.shields.io/github/issues/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/good%20first%20issue?color=7057ff&logo=github)](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+
+## 🌟 **Welcome Contributors!**
+
+**We love community contributions!** 🎉 This project is designed to be **contributor-friendly** with:
+
+- 🚀 **Simple setup** - Get started in minutes
+- 🤖 **Helpful automation** - Our bots guide you through the process
+- 📚 **Clear documentation** - Everything you need to know
+- 🤝 **Welcoming community** - We're here to help you succeed
+
+### 🎯 **Quick Ways to Contribute**
+- 🐛 **Found a bug?** [Open an issue](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues/new?template=bug-report.yml)
+- 📚 **Improve docs** - Fix typos, add examples, clarify instructions
+- ✨ **Add features** - Check our [good first issues](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+- 🧪 **Test examples** - Try our configurations and share feedback
+
+**New to open source?** Perfect! Check our [Community Contributing Guide](./CONTRIBUTING_COMMUNITY.md) for a gentle introduction.
+
+---
 
 > **Note:** This module is specifically tailored for developer teams building on the Stratus Corp Azure Landing Zone with Container App Environment. It is optimized for the IaC Repositories created for each new system or team starting their journey in Stratus. Some input variables and design choices are opinionated for this workflow. **This module may not be the optimal choice for other use cases or non-Stratus environments.**
 
