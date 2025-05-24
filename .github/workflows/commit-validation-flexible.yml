@@ -1,0 +1,134 @@
+name: Commit Message Guidance
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  commit-guidance:
+    name: Commit Message Guidance
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Analyze commit messages
+        run: |
+          echo "📝 Analyzing commit messages for helpful suggestions..."
+          
+          # Get commits in this PR (excluding merge commits)
+          commits=$(git log --format="%H %s" --no-merges origin/main..HEAD)
+          
+          # Conventional commit pattern (for suggestions, not enforcement)
+          conventional_pattern="^(feat|fix|docs|style|refactor|test|chore)(\(.+\))?: .+"
+          
+          suggestions=""
+          good_commits=""
+          total_commits=0
+          conventional_commits=0
+          
+          while IFS= read -r commit; do
+            if [ -n "$commit" ]; then
+              total_commits=$((total_commits + 1))
+              hash=$(echo "$commit" | cut -d' ' -f1)
+              message=$(echo "$commit" | cut -d' ' -f2-)
+              
+              if echo "$message" | grep -qE "$conventional_pattern"; then
+                conventional_commits=$((conventional_commits + 1))
+                good_commits="$good_commits\n✅ $message"
+              else
+                # Provide helpful suggestions instead of blocking
+                if echo "$message" | grep -qiE "^(fix|bug|error)"; then
+                  suggestions="$suggestions\n💡 \`$message\` → Consider: \`fix: $message\`"
+                elif echo "$message" | grep -qiE "^(add|new|create)"; then
+                  suggestions="$suggestions\n💡 \`$message\` → Consider: \`feat: $message\`"
+                elif echo "$message" | grep -qiE "^(update|change|modify).*doc"; then
+                  suggestions="$suggestions\n💡 \`$message\` → Consider: \`docs: $message\`"
+                else
+                  suggestions="$suggestions\n💡 \`$message\` → Consider adding a type prefix like \`feat:\`, \`fix:\`, or \`docs:\`"
+                fi
+              fi
+            fi
+          done <<< "$commits"
+          
+          # Save results for the comment step
+          echo "total_commits=$total_commits" >> $GITHUB_ENV
+          echo "conventional_commits=$conventional_commits" >> $GITHUB_ENV
+          echo "suggestions<<EOF" >> $GITHUB_ENV
+          echo -e "$suggestions" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          echo "good_commits<<EOF" >> $GITHUB_ENV
+          echo -e "$good_commits" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Comment with guidance
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const totalCommits = parseInt('${{ env.total_commits }}');
+            const conventionalCommits = parseInt('${{ env.conventional_commits }}');
+            const suggestions = `${{ env.suggestions }}`;
+            const goodCommits = `${{ env.good_commits }}`;
+            
+            if (totalCommits === 0) return; // No commits to analyze
+            
+            let output = `## 📝 Commit Message Guidance\n\n`;
+            
+            if (conventionalCommits === totalCommits) {
+              output += `### 🎉 Excellent Commit Messages!\n\n`;
+              output += `All your commit messages follow conventional commit format. Great job!\n\n`;
+              if (goodCommits.trim()) {
+                output += `${goodCommits}\n\n`;
+              }
+            } else if (conventionalCommits > 0) {
+              output += `### 👍 Good Progress!\n\n`;
+              output += `${conventionalCommits} out of ${totalCommits} commits follow conventional format.\n\n`;
+              if (goodCommits.trim()) {
+                output += `**Well-formatted commits:**\n${goodCommits}\n\n`;
+              }
+              if (suggestions.trim()) {
+                output += `**Suggestions for improvement:**\n${suggestions}\n\n`;
+              }
+            } else {
+              output += `### 💡 Commit Message Suggestions\n\n`;
+              output += `Here are some suggestions to make your commit messages even better:\n\n`;
+              if (suggestions.trim()) {
+                output += `${suggestions}\n\n`;
+              }
+            }
+            
+            output += `### 📚 About Conventional Commits\n\n`;
+            output += `Conventional commits help us:\n`;
+            output += `- 🤖 Generate changelogs automatically\n`;
+            output += `- 🏷️ Determine version bumps\n`;
+            output += `- 📖 Make project history easier to read\n\n`;
+            output += `**Format**: \`type(scope): description\`\n\n`;
+            output += `**Common types**:\n`;
+            output += `- \`feat:\` - New features\n`;
+            output += `- \`fix:\` - Bug fixes\n`;
+            output += `- \`docs:\` - Documentation changes\n`;
+            output += `- \`style:\` - Code formatting\n`;
+            output += `- \`refactor:\` - Code restructuring\n`;
+            output += `- \`test:\` - Adding tests\n`;
+            output += `- \`chore:\` - Maintenance tasks\n\n`;
+            output += `**Examples**:\n`;
+            output += `- \`feat(auth): add OAuth2 integration\`\n`;
+            output += `- \`fix: resolve memory leak in parser\`\n`;
+            output += `- \`docs: update installation guide\`\n\n`;
+            output += `---\n\n`;
+            output += `💡 **Don't worry!** This is just guidance - your PR won't be blocked for commit message format. We appreciate all contributions! 🙏`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            }); 

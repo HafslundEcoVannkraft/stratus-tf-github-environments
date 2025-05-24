@@ -1,0 +1,192 @@
+name: Community PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  # Essential validation only - keep it simple for community contributors
+  essential-validation:
+    name: Essential Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9.0"
+
+      # Core requirement: Terraform must be valid
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+
+      # Only validate YAML if examples are changed
+      - name: Check if examples changed
+        id: examples-changed
+        run: |
+          if git diff --name-only origin/main...HEAD | grep -q "examples/"; then
+            echo "examples_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "examples_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate YAML Examples (if changed)
+        if: steps.examples-changed.outputs.examples_changed == 'true'
+        run: |
+          # Install yq for YAML validation
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          
+          echo "Validating YAML files..."
+          for file in examples/*.yaml examples/*.yml; do
+            if [ -f "$file" ]; then
+              echo "Validating $file"
+              if ! yq eval '.' "$file" > /dev/null 2>&1; then
+                echo "❌ $file is invalid"
+                exit 1
+              else
+                echo "✅ $file is valid"
+              fi
+            fi
+          done
+
+      # Security check - but don't fail, just warn
+      - name: Security Scan (Advisory)
+        run: |
+          echo "🔍 Checking for potential sensitive information..."
+          
+          # Look for obvious secrets but don't fail the build
+          sensitive_found=false
+          if grep -r -i -E "(password|secret|token)\s*=\s*[\"'][^\"']*[\"']" --include="*.tf" --include="*.md" --include="*.yaml" . || true; then
+            echo "⚠️ Potential sensitive information detected. Please review and use variables instead of hardcoded values."
+            sensitive_found=true
+          fi
+          
+          if [ "$sensitive_found" = false ]; then
+            echo "✅ No obvious sensitive information found"
+          fi
+
+      # Helpful feedback comment
+      - name: Comment PR Results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fmtStatus = '${{ steps.fmt.outcome }}';
+            const initStatus = '${{ steps.init.outcome }}';
+            const validateStatus = '${{ steps.validate.outcome }}';
+            const examplesChanged = '${{ steps.examples-changed.outputs.examples_changed }}';
+            
+            const allPassed = fmtStatus === 'success' && initStatus === 'success' && validateStatus === 'success';
+            
+            let output = `## 🤖 Automated Validation Results\n\n`;
+            
+            if (allPassed) {
+              output += `### ✅ All Essential Checks Passed!\n\n`;
+              output += `Your contribution looks great! A maintainer will review it soon.\n\n`;
+            } else {
+              output += `### ⚠️ Some Issues Need Attention\n\n`;
+            }
+            
+            output += `| Check | Status | Action |\n`;
+            output += `|-------|--------|--------|\n`;
+            output += `| Terraform Format | ${fmtStatus === 'success' ? '✅' : '❌'} | ${fmtStatus === 'success' ? 'Properly formatted' : 'Run `terraform fmt -recursive` to fix'} |\n`;
+            output += `| Terraform Init | ${initStatus === 'success' ? '✅' : '❌'} | ${initStatus === 'success' ? 'Initialization successful' : 'Check Terraform configuration'} |\n`;
+            output += `| Terraform Validate | ${validateStatus === 'success' ? '✅' : '❌'} | ${validateStatus === 'success' ? 'Configuration is valid' : 'Fix Terraform validation errors'} |\n`;
+            
+            if (examplesChanged === 'true') {
+              output += `| YAML Examples | ✅ | Examples validated successfully |\n`;
+            }
+            
+            if (!allPassed) {
+              output += `\n### 🛠️ Quick Fixes\n\n`;
+              if (fmtStatus !== 'success') {
+                output += `**Formatting**: Run \`terraform fmt -recursive\` in your local repository and commit the changes.\n\n`;
+              }
+              output += `💡 **Need help?** Check our [Contributing Guide](./CONTRIBUTING.md) or ask in the PR comments!\n\n`;
+            }
+            
+            output += `---\n\n`;
+            output += `🙏 **Thank you for contributing!** Every contribution helps make this project better.\n`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+  # Auto-label PRs to help with organization
+  auto-label:
+    name: Auto Label
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Auto-assign helpful labels
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const { number } = context.issue;
+            
+            try {
+              const { data: files } = await github.rest.pulls.listFiles({
+                owner, repo, pull_number: number
+              });
+              
+              const labels = [];
+              const changedFiles = files.map(f => f.filename);
+              
+              // Simple, helpful labels
+              if (changedFiles.some(f => f.endsWith('.tf'))) labels.push('terraform');
+              if (changedFiles.some(f => f.includes('README.md'))) labels.push('documentation');
+              if (changedFiles.some(f => f.includes('examples/'))) labels.push('examples');
+              if (changedFiles.some(f => f.includes('.github/'))) labels.push('github-actions');
+              
+              // Size labels to help reviewers
+              const totalChanges = files.reduce((sum, f) => sum + f.changes, 0);
+              if (totalChanges < 20) labels.push('size/small');
+              else if (totalChanges < 100) labels.push('size/medium');
+              else labels.push('size/large');
+              
+              // Apply labels if possible, otherwise suggest them
+              if (labels.length > 0) {
+                try {
+                  await github.rest.issues.addLabels({
+                    owner, repo, issue_number: number, labels
+                  });
+                } catch (error) {
+                  // If we can't add labels, suggest them in a comment
+                  await github.rest.issues.createComment({
+                    issue_number: number, owner, repo,
+                    body: `🏷️ **Suggested labels**: ${labels.map(l => `\`${l}\``).join(', ')}`
+                  });
+                }
+              }
+            } catch (error) {
+              console.log(`Auto-labeling failed: ${error.message}`);
+            } 
