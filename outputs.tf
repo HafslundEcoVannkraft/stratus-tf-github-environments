@@ -245,3 +245,106 @@ output "raw_configuration" {
   sensitive = false
 }
 
+# =============================================================================
+# VALIDATION STATUS
+# =============================================================================
+
+output "validation_status" {
+  description = "Comprehensive validation status and any issues found during configuration processing."
+  value = {
+    overall_status = local.validation_passed ? "PASSED" : "FAILED"
+    can_deploy     = local.can_deploy
+
+    validation_results = {
+      yaml_structure = {
+        has_repositories     = local.validation_results.yaml_has_repositories
+        repositories_valid   = local.validation_results.yaml_repositories_valid
+        environments_valid   = local.validation_results.yaml_environments_valid
+        no_duplicates        = local.validation_results.no_duplicate_environments
+        container_envs_valid = local.validation_results.container_environments_valid
+        reviewers_valid      = local.validation_results.reviewers_valid
+      }
+      remote_state = {
+        accessible                        = local.validation_results.remote_state_accessible
+        github_environment_config_present = local.validation_results.github_environment_config_present
+        role_assignments_valid            = local.validation_results.role_assignments_valid
+      }
+      minimum_requirements = local.minimum_deployment_requirements
+    }
+
+    validation_errors = local.validation_errors
+
+    recommendations = length(local.validation_errors) > 0 ? [
+      "Review validation errors above and fix configuration issues",
+      "Ensure YAML structure follows the documented format",
+      "Verify remote state configuration is correct",
+      "Check that all required variables are provided"
+      ] : [
+      "Configuration is valid and ready for deployment",
+      "All validation checks passed successfully"
+    ]
+
+    help = {
+      documentation_url = "https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/blob/main/README.md"
+      common_fixes = {
+        yaml_issues            = "Check YAML syntax and ensure all required fields are present"
+        remote_state_issues    = "Verify remote state configuration and permissions"
+        duplicate_environments = "Ensure each repository:environment combination is unique"
+        reviewer_issues        = "Check that users have 'username' field and teams have 'name' or 'slug'"
+      }
+    }
+  }
+}
+
+# =============================================================================
+# NAMING AND TAGGING INFORMATION
+# =============================================================================
+
+output "naming_and_tagging" {
+  description = "Information about the naming conventions and tagging strategy used for resources."
+  value = {
+    naming_conventions = {
+      resource_group          = local.naming.resource_group_name
+      managed_identity_prefix = local.naming.managed_identity_prefix
+      naming_pattern          = "Uses consistent ${var.code_name}-${var.environment} prefix with ${local.naming.suffix} suffix"
+    }
+
+    tagging_strategy = {
+      common_tags_applied = local.common_tags
+      tag_categories = {
+        core_identification = ["Environment", "CodeName", "Purpose", "ManagedBy"]
+        repository_tracking = ["ModuleRepository", "ModuleVersion", "IaCRepository"]
+        deployment_metadata = ["DeploymentDate", "TerraformWorkspace"]
+        github_integration  = ["GitHubOrganization", "TotalEnvironments", "TotalRepositories"]
+        azure_integration   = ["AzureSubscription", "AzureTenant", "AzureRegion"]
+      }
+      resource_specific_tags = {
+        managed_identities = ["ResourceType", "GitHubRepository", "GitHubEnvironment", "EnvironmentKey"]
+      }
+    }
+
+    tracking_information = {
+      module_repository    = "HafslundEcoVannkraft/stratus-tf-aca-gh-vending"
+      module_version       = var.module_repo_ref
+      iac_repository       = var.iac_repo_url != null ? var.iac_repo_url : "Not provided"
+      deployment_timestamp = local.common_tags.DeploymentDate
+    }
+  }
+}
+
+# =============================================================================
+# DATA SOURCE OPTIMIZATION
+# =============================================================================
+
+output "data_source_optimization" {
+  description = "Information about data source optimization and GitHub API efficiency."
+  value = {
+    optimization_status     = "Enabled - Only unique users/teams are looked up"
+    unique_users_referenced = local.referenced_users
+    unique_teams_referenced = local.referenced_teams
+    total_user_lookups      = length(local.referenced_users)
+    total_team_lookups      = length(local.referenced_teams)
+    efficiency_note         = "Data sources use pre-computed sets to minimize GitHub API calls and improve performance"
+  }
+}
+

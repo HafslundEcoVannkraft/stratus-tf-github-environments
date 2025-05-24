@@ -129,6 +129,8 @@ jobs:
           {
             echo "github_owner = \"${{ github.event.inputs.github_owner }}\""
             echo "github_env_file = \"$(basename "$ENV_FILE")\""
+            echo "module_repo_ref = \"${{ github.event.inputs.module_repo_ref }}\""
+            echo "iac_repo_url = \"${{ github.server_url }}/${{ github.repository }}\""
             
             # Parse remote_state_config if provided (format: rg=name,sa=name,container=name,key=name)
             if [ -n "${{ github.event.inputs.remote_state_config }}" ]; then

@@ -1,0 +1,486 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  # Terraform validation and formatting
+  terraform-validation:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9.0"
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+
+      - name: Comment PR - Terraform Results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `
+            ## 🔧 Terraform Validation Results
+            
+            | Check | Status | Details |
+            |-------|--------|---------|
+            | Format | ${{ steps.fmt.outcome == 'success' && '✅ Pass' || '❌ Fail' }} | ${{ steps.fmt.outcome == 'success' && 'Code is properly formatted' || 'Run `terraform fmt -recursive` to fix formatting' }} |
+            | Init | ${{ steps.init.outcome == 'success' && '✅ Pass' || '❌ Fail' }} | ${{ steps.init.outcome == 'success' && 'Initialization successful' || 'Terraform initialization failed' }} |
+            | Validate | ${{ steps.validate.outcome == 'success' && '✅ Pass' || '❌ Fail' }} | ${{ steps.validate.outcome == 'success' && 'Configuration is valid' || 'Terraform validation failed' }} |
+            
+            ${{ steps.fmt.outcome != 'success' && '**Action Required:** Please run `terraform fmt -recursive` to fix formatting issues.' || '' }}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+      - name: Fail if Terraform checks failed
+        if: steps.fmt.outcome != 'success' || steps.init.outcome != 'success' || steps.validate.outcome != 'success'
+        run: exit 1
+
+  # YAML validation for examples
+  yaml-validation:
+    name: YAML Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Validate YAML files
+        id: yaml-check
+        run: |
+          echo "Validating YAML files..."
+          yaml_files=$(find examples/ -name "*.yaml" -o -name "*.yml" 2>/dev/null || true)
+          
+          if [ -z "$yaml_files" ]; then
+            echo "No YAML files found in examples/"
+            exit 0
+          fi
+          
+          failed_files=""
+          for file in $yaml_files; do
+            echo "Validating $file"
+            if ! yq eval '.' "$file" > /dev/null 2>&1; then
+              echo "❌ $file is invalid"
+              failed_files="$failed_files $file"
+            else
+              echo "✅ $file is valid"
+            fi
+          done
+          
+          if [ -n "$failed_files" ]; then
+            echo "failed_files=$failed_files" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Validate YAML schema structure
+        run: |
+          echo "Checking YAML schema structure..."
+          for file in examples/*.yaml examples/*.yml; do
+            if [ -f "$file" ]; then
+              echo "Checking structure of $file"
+              # Check for required top-level keys
+              if ! yq eval '.repositories' "$file" > /dev/null 2>&1; then
+                echo "❌ $file missing required 'repositories' key"
+                exit 1
+              fi
+              
+              # Check for required repository fields
+              repos=$(yq eval '.repositories | length' "$file")
+              for ((i=0; i<repos; i++)); do
+                if ! yq eval ".repositories[$i].repo" "$file" > /dev/null 2>&1; then
+                  echo "❌ $file repository $i missing 'repo' field"
+                  exit 1
+                fi
+                if ! yq eval ".repositories[$i].environments" "$file" > /dev/null 2>&1; then
+                  echo "❌ $file repository $i missing 'environments' field"
+                  exit 1
+                fi
+              done
+              echo "✅ $file has valid structure"
+            fi
+          done
+
+  # Documentation validation
+  documentation-validation:
+    name: Documentation Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for required documentation updates
+        id: doc-check
+        run: |
+          echo "Checking for documentation updates..."
+          
+          # Check if code changes require documentation updates
+          code_changed=$(git diff --name-only origin/main...HEAD | grep -E '\.(tf|hcl)$' || true)
+          readme_changed=$(git diff --name-only origin/main...HEAD | grep 'README.md' || true)
+          changelog_changed=$(git diff --name-only origin/main...HEAD | grep 'CHANGELOG.md' || true)
+          examples_changed=$(git diff --name-only origin/main...HEAD | grep 'examples/' || true)
+          
+          echo "code_changed=$code_changed" >> $GITHUB_OUTPUT
+          echo "readme_changed=$readme_changed" >> $GITHUB_OUTPUT
+          echo "changelog_changed=$changelog_changed" >> $GITHUB_OUTPUT
+          echo "examples_changed=$examples_changed" >> $GITHUB_OUTPUT
+          
+          # Create documentation checklist
+          doc_warnings=""
+          if [ -n "$code_changed" ] && [ -z "$readme_changed" ]; then
+            doc_warnings="$doc_warnings\n- ⚠️ Code changes detected but README.md not updated"
+          fi
+          if [ -n "$code_changed" ] && [ -z "$changelog_changed" ]; then
+            doc_warnings="$doc_warnings\n- ⚠️ Code changes detected but CHANGELOG.md not updated"
+          fi
+          if [ -n "$examples_changed" ]; then
+            echo "- ✅ Example files updated"
+          fi
+          
+          echo "doc_warnings=$doc_warnings" >> $GITHUB_OUTPUT
+
+      - name: Check for broken links in README
+        run: |
+          echo "Checking for broken internal links in README.md..."
+          # Check for broken internal file references
+          grep -n '\[.*\]([^h].*\.md)' README.md | while read -r line; do
+            file_ref=$(echo "$line" | sed -n 's/.*\[\([^]]*\)\](\([^)]*\)).*/\2/p')
+            if [ -n "$file_ref" ] && [ ! -f "$file_ref" ]; then
+              echo "❌ Broken link found: $file_ref"
+              exit 1
+            fi
+          done
+
+      - name: Validate example references in README
+        run: |
+          echo "Checking if examples referenced in README exist..."
+          # Extract example file references from README
+          grep -o 'examples/[^)]*\.yaml' README.md | while read -r example_file; do
+            if [ ! -f "$example_file" ]; then
+              echo "❌ Referenced example file not found: $example_file"
+              exit 1
+            else
+              echo "✅ Example file exists: $example_file"
+            fi
+          done
+
+  # Code quality checks
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for TODO/FIXME comments
+        id: todo-check
+        run: |
+          echo "Checking for TODO/FIXME comments..."
+          todos=$(grep -r -n "TODO\|FIXME\|XXX\|HACK" --include="*.tf" --include="*.md" . || true)
+          if [ -n "$todos" ]; then
+            echo "Found TODO/FIXME comments:"
+            echo "$todos"
+            echo "todos_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "No TODO/FIXME comments found"
+            echo "todos_found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for debugging code
+        run: |
+          echo "Checking for debugging code..."
+          debug_patterns="console\.log\|print(\|debugger\|var\.debug"
+          debug_code=$(grep -r -n "$debug_patterns" --include="*.tf" . || true)
+          if [ -n "$debug_code" ]; then
+            echo "❌ Debugging code found:"
+            echo "$debug_code"
+            exit 1
+          else
+            echo "✅ No debugging code found"
+          fi
+
+      - name: Check file naming conventions
+        run: |
+          echo "Checking file naming conventions..."
+          # Check for proper file naming (lowercase, hyphens, no spaces)
+          bad_names=$(find . -name "*.tf" -o -name "*.md" -o -name "*.yaml" -o -name "*.yml" | grep -E '[A-Z ]' || true)
+          if [ -n "$bad_names" ]; then
+            echo "❌ Files with improper naming found:"
+            echo "$bad_names"
+            echo "Please use lowercase with hyphens for file names"
+            exit 1
+          else
+            echo "✅ File naming conventions followed"
+          fi
+
+  # Security checks
+  security-validation:
+    name: Security Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for sensitive information
+        run: |
+          echo "Checking for potential sensitive information..."
+          
+          # Patterns to check for sensitive data
+          sensitive_patterns=(
+            "password\s*=\s*[\"'][^\"']*[\"']"
+            "secret\s*=\s*[\"'][^\"']*[\"']"
+            "token\s*=\s*[\"'][^\"']*[\"']"
+            "key\s*=\s*[\"'][^\"']*[\"']"
+            "subscription_id\s*=\s*[\"'][0-9a-f-]{36}[\"']"
+            "tenant_id\s*=\s*[\"'][0-9a-f-]{36}[\"']"
+            "client_id\s*=\s*[\"'][0-9a-f-]{36}[\"']"
+          )
+          
+          found_sensitive=false
+          for pattern in "${sensitive_patterns[@]}"; do
+            matches=$(grep -r -i -E "$pattern" --include="*.tf" --include="*.md" --include="*.yaml" --include="*.yml" . || true)
+            if [ -n "$matches" ]; then
+              echo "⚠️ Potential sensitive information found:"
+              echo "$matches"
+              found_sensitive=true
+            fi
+          done
+          
+          if [ "$found_sensitive" = true ]; then
+            echo ""
+            echo "Please review the above matches and ensure no real sensitive data is committed."
+            echo "Use variables, data sources, or placeholder values instead."
+          else
+            echo "✅ No obvious sensitive information found"
+          fi
+
+      - name: Check provider version constraints
+        run: |
+          echo "Checking provider version constraints..."
+          # Ensure provider versions are properly constrained
+          if grep -q 'version\s*=\s*"[^~>]' version.tf; then
+            echo "⚠️ Consider using pessimistic version constraints (~>) for providers"
+          else
+            echo "✅ Provider versions properly constrained"
+          fi
+
+  # Conventional commits check
+  commit-validation:
+    name: Commit Message Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate commit messages
+        run: |
+          echo "Validating commit messages against conventional commits..."
+          
+          # Get commits in this PR
+          commits=$(git log --format="%H %s" origin/main..HEAD)
+          
+          # Conventional commit pattern
+          pattern="^(feat|fix|docs|style|refactor|test|chore)(\(.+\))?: .{1,50}"
+          
+          invalid_commits=""
+          while IFS= read -r commit; do
+            if [ -n "$commit" ]; then
+              hash=$(echo "$commit" | cut -d' ' -f1)
+              message=$(echo "$commit" | cut -d' ' -f2-)
+              
+              if ! echo "$message" | grep -qE "$pattern"; then
+                invalid_commits="$invalid_commits\n- $hash: $message"
+              fi
+            fi
+          done <<< "$commits"
+          
+          if [ -n "$invalid_commits" ]; then
+            echo "❌ Invalid commit messages found:"
+            echo -e "$invalid_commits"
+            echo ""
+            echo "Please follow conventional commits format:"
+            echo "type(scope): description"
+            echo ""
+            echo "Examples:"
+            echo "feat(validation): add Azure naming constraints"
+            echo "fix(github): resolve API rate limiting"
+            echo "docs(readme): update configuration examples"
+            exit 1
+          else
+            echo "✅ All commit messages follow conventional commits format"
+          fi
+
+  # Create summary comment
+  pr-summary:
+    name: PR Summary
+    runs-on: ubuntu-latest
+    needs: [terraform-validation, yaml-validation, documentation-validation, code-quality, security-validation, commit-validation]
+    if: always() && github.event_name == 'pull_request'
+    
+    steps:
+      - name: Create PR summary comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const jobs = [
+              { name: 'Terraform Validation', status: '${{ needs.terraform-validation.result }}' },
+              { name: 'YAML Validation', status: '${{ needs.yaml-validation.result }}' },
+              { name: 'Documentation Validation', status: '${{ needs.documentation-validation.result }}' },
+              { name: 'Code Quality', status: '${{ needs.code-quality.result }}' },
+              { name: 'Security Validation', status: '${{ needs.security-validation.result }}' },
+              { name: 'Commit Validation', status: '${{ needs.commit-validation.result }}' }
+            ];
+            
+            const getStatusIcon = (status) => {
+              switch(status) {
+                case 'success': return '✅';
+                case 'failure': return '❌';
+                case 'cancelled': return '⏹️';
+                case 'skipped': return '⏭️';
+                default: return '⏳';
+              }
+            };
+            
+            const allPassed = jobs.every(job => job.status === 'success');
+            const summary = allPassed ? '🎉 All checks passed!' : '⚠️ Some checks need attention';
+            
+            const jobSummary = jobs.map(job => 
+              `| ${job.name} | ${getStatusIcon(job.status)} ${job.status} |`
+            ).join('\n');
+            
+            const output = `
+            ## 📋 Pull Request Validation Summary
+            
+            ${summary}
+            
+            | Check | Status |
+            |-------|--------|
+            ${jobSummary}
+            
+            ${allPassed ? 
+              '### ✅ Ready for Review\nAll automated checks have passed. This PR is ready for human review.' :
+              '### ⚠️ Action Required\nPlease address the failing checks above before requesting review.'
+            }
+            
+            ---
+            
+            ### 📚 Contributing Guidelines
+            - [Contributing Guide](./CONTRIBUTING.md)
+            - [Pull Request Template](./.github/PULL_REQUEST_TEMPLATE.md)
+            - [Code of Conduct](./CONTRIBUTING.md#code-of-conduct)
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+  # Auto-assign labels based on changes
+  auto-label:
+    name: Auto Label PR
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Auto-assign labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const { number } = context.issue;
+            
+            // Get changed files
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner,
+              repo,
+              pull_number: number
+            });
+            
+            const labels = [];
+            const changedFiles = files.map(f => f.filename);
+            
+            // Determine labels based on changed files
+            if (changedFiles.some(f => f.endsWith('.tf'))) {
+              labels.push('terraform');
+            }
+            if (changedFiles.some(f => f.includes('README.md') || f.includes('CONTRIBUTING.md'))) {
+              labels.push('documentation');
+            }
+            if (changedFiles.some(f => f.includes('examples/'))) {
+              labels.push('examples');
+            }
+            if (changedFiles.some(f => f.includes('.github/'))) {
+              labels.push('github-actions');
+            }
+            if (changedFiles.some(f => f.includes('version.tf') || f.includes('dependabot'))) {
+              labels.push('dependencies');
+            }
+            
+            // Add size label based on changes
+            const totalChanges = files.reduce((sum, f) => sum + f.changes, 0);
+            if (totalChanges < 10) {
+              labels.push('size/XS');
+            } else if (totalChanges < 30) {
+              labels.push('size/S');
+            } else if (totalChanges < 100) {
+              labels.push('size/M');
+            } else if (totalChanges < 500) {
+              labels.push('size/L');
+            } else {
+              labels.push('size/XL');
+            }
+            
+            // Apply labels
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: number,
+                labels
+              });
+            } 

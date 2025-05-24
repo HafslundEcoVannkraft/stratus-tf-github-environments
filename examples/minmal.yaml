@@ -1,11 +1,38 @@
 # Minimal configuration for Azure Container App GitHub Environments
+# This is the simplest possible configuration to get started
+#
+# This example demonstrates:
+# - Basic repository and environment setup
+# - Container App Environment mapping
+# - Essential security configurations
+# - Minimal approval requirements
+
 repositories:
-  - repo: your-app-repo
+  - repo: your-app-repo  # Replace with your actual GitHub repository name
     environments:
+      # Basic development environment with minimal restrictions
       - name: dev
         container_environment: dev  # Maps to "dev" key in remote state environments
-        wait_timer: 0
-        prevent_self_review: false
+        wait_timer: 0               # No wait time for development
+        prevent_self_review: false  # Allow self-approval for quick iteration
         reviewers:
-          users: []
+          users: []                 # No required reviewers for development
           teams: []
+        # No deployment policy = any branch can deploy
+      
+      # Production environment with basic protections
+      - name: prod
+        container_environment: prod  # Maps to "prod" key in remote state environments
+        wait_timer: 10              # Brief wait to prevent accidental deployments
+        prevent_self_review: true   # Require approval from someone else
+        reviewers:
+          users:
+            - username: "your-admin-username"  # Replace with actual GitHub username
+          teams: []
+
+# Quick Setup Notes:
+# 1. Replace "your-app-repo" with your actual GitHub repository name
+# 2. Replace "your-admin-username" with a real GitHub username who should approve production deployments
+# 3. Ensure the remote state contains "dev" and "prod" environments with proper configuration
+# 4. This creates 2 GitHub environments with automatic Azure OIDC federation
+# 5. Variables and role assignments come from the remote state automatically

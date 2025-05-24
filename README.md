@@ -1,5 +1,8 @@
 # GitHub Environment Vending for Azure Container Apps
 
+[![Terraform Validation](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/pr-validation.yml)
+[![Dependabot Auto-Merge](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/dependabot-auto-merge.yml/badge.svg)](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/dependabot-auto-merge.yml)
+
 > **Note:** This module is specifically tailored for developer teams building on the Stratus Corp Azure Landing Zone with Container App Environment. It is optimized for the IaC Repositories created for each new system or team starting their journey in Stratus. Some input variables and design choices are opinionated for this workflow. **This module may not be the optimal choice for other use cases or non-Stratus environments.**
 
 ---
@@ -1239,173 +1242,73 @@ If you encounter persistent errors with specific environments, consider these wo
 
 These issues appear to be related to GitHub's API implementation, not with the module itself.
 
-
-
 ## Variables
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| `code_name` | Project/Application code name | `string` | n/a | yes |
-| `environment` | Azure environment name (dev, test, prod) | `string` | n/a | yes |
-| `github_token` | GitHub token for API access | `string` | n/a | yes |
-| `github_owner` | GitHub organization or user name | `string` | `HafslundEcoVannkraft` | no |
-| `location` | Azure region for resources | `string` | n/a | yes |
-| `github_env_file` | Filename of GitHub environments configuration file | `string` | `"github-environments.yaml"` | no |
-| `state_storage_account_name` | Storage account for Terraform state | `string` | n/a | yes |
+| `code_name` | Project/Application code name (3-63 chars, lowercase alphanumeric + hyphens, no reserved Azure prefixes) | `string` | n/a | yes |
+| `environment` | Azure environment name (dev, test, prod, staging, uat, preprod) - max 10 chars | `string` | n/a | yes |
+| `github_token` | GitHub token for API access (requires repo, workflow, read:org scopes) | `string` | n/a | yes |
+| `github_owner` | GitHub organization or user name (max 39 chars, valid GitHub format) | `string` | `HafslundEcoVannkraft` | no |
+| `location` | Azure region for resources (validated against common regions) | `string` | `norwayeast` | no |
+| `github_env_file` | Filename of GitHub environments configuration file (must be .yaml/.yml) | `string` | `"github-environments.yaml"` | no |
+| `state_storage_account_name` | Storage account for Terraform state (3-24 chars, lowercase alphanumeric) | `string` | n/a | yes |
+| `subscription_id` | Azure Subscription ID (valid UUID format) | `string` | n/a | yes |
+| `resource_group_suffix` | Optional custom suffix for resource group name (max 10 chars, lowercase alphanumeric) | `string` | `null` | no |
+| `module_repo_ref` | Git reference of module repository for deployment tracking (1-100 chars) | `string` | `"main"` | no |
+| `iac_repo_url` | Optional URL of IaC repository for tracking (must start with https://) | `string` | `null` | no |
+| `remote_state_resource_group_name` | Optional override for remote state resource group name | `string` | `null` | no |
+| `remote_state_storage_account_name` | Optional override for remote state storage account name | `string` | `null` | no |
+| `remote_state_container` | Optional override for remote state container name | `string` | `null` | no |
+| `remote_state_key` | Optional override for remote state key (must end with .tfstate) | `string` | `null` | no |
 
-## Notes for Single Organization Support
+### Enhanced Features
 
-This module is designed to work with repositories within a single GitHub organization. If you need to manage repositories across multiple organizations, create separate deployments with different configurations.
+#### **Comprehensive Input Validation**
+All variables now include validation rules that catch errors early:
+- **Azure naming constraints**: Enforces Azure resource naming requirements
+- **GitHub format validation**: Ensures valid GitHub usernames and file formats
+- **Reserved prefix protection**: Prevents conflicts with Azure reserved names
+- **Length constraints**: Validates character limits for all inputs
 
-## Understanding GitHub Environments and Deployments
+#### **Consistent Resource Naming**
+The module uses a standardized naming convention:
+- **Pattern**: `{code_name}-{resource_type}-{environment}-{purpose}-{suffix}`
+- **Example**: `myapp-rg-dev-github-identities-a1b2`
+- **Customizable suffix**: Use `resource_group_suffix` for predictable naming
 
-> **Note:** While GitHub's official documentation is comprehensive, it's often scattered across multiple pages and not focused on specific use cases. This section provides a distilled set of best practices specifically tailored for Azure Container Apps deployments. We've consolidated the most relevant information based on real-world experience with the Stratus platform to help you implement a secure and effective deployment strategy.
+#### **Comprehensive Resource Tagging**
+All Azure resources are tagged with:
+- **Core identification**: Environment, CodeName, Purpose, ManagedBy
+- **Repository tracking**: ModuleRepository, ModuleVersion, IaCRepository
+- **Deployment metadata**: DeploymentDate, TerraformWorkspace
+- **GitHub integration**: GitHubOrganization, TotalEnvironments, TotalRepositories
+- **Azure integration**: AzureSubscription, AzureTenant, AzureRegion
+- **Resource-specific tags**: ResourceType, GitHubRepository, GitHubEnvironment
 
-### What are GitHub Environments?
+#### **Data Source Optimization**
+The module optimizes GitHub API calls by:
+- **Pre-computing unique users/teams**: Only looks up referenced reviewers
+- **Eliminating duplicates**: Uses `toset()` to prevent duplicate API calls
+- **Performance improvement**: Reduces plan time and API rate limiting
 
-GitHub environments are named deployment targets that provide protection rules, secrets, and variables for deployments. They allow you to:
+## Dependency Management
 
-1. **Control deployment workflows** through approval requirements and wait timers
-2. **Separate deployment concerns** across different stages (development, staging, production)
-3. **Secure sensitive data** by making secrets and variables available only to specific environments
-4. **Restrict who can deploy** and which branches or tags can be deployed
+This module uses [Dependabot](.github/DEPENDABOT.md) for automatic dependency updates:
 
-### How Environments Work with GitHub Actions
+### 🤖 **Automated Updates**
+- **Terraform Providers**: Weekly updates every Monday
+- **GitHub Actions**: Weekly updates with validation
+- **Security Updates**: Automatic priority updates
 
-When a GitHub Actions workflow deploys to an environment, it:
+### 🔄 **Auto-Merge Process**
+- **Safe Updates**: Patch and security updates are automatically merged
+- **Validation Required**: All updates must pass Terraform validation
+- **Manual Review**: Major version updates require team approval
 
-1. **Must explicitly reference** the environment by name (e.g., `environment: production`)
-2. **Waits for any protection rules** to pass before running
-3. **Can access environment secrets and variables** only after passing protection rules
-4. **Creates a deployment record** visible on the repository's deployments page
-5. **Uses the environment's OIDC identity** to authenticate with Azure
+### 📋 **Update Grouping**
+- **Azure Providers**: `azurerm`, `azapi` grouped together
+- **GitHub Providers**: `github` provider updates
+- **Utility Providers**: `random`, `null`, `time` grouped together
 
-Here's a simplified view of how environments fit into a typical Container Apps deployment flow:
-
-```
-GitHub Repository
-  │
-  ├── Code Changes (PR or push)
-  │     │
-  │     ▼
-  ├── GitHub Actions Workflow
-  │     │
-  │     ▼
-  ├── Environment Protection Rules
-  │     │ (wait timers, approvals, branch restrictions)
-  │     ▼
-  ├── Access to Environment Secrets & Variables
-  │     │
-  │     ▼
-  ├── OIDC Authentication with Azure
-  │     │
-  │     ▼  
-  └── Deployment to Azure Container Apps
-```
-
-### Best Practices for Environment Configuration
-
-#### 1. Separate Plan and Apply Environments
-
-For Azure Container Apps deployments, we recommend creating separate environments for planning and applying changes:
-
-- **`*-plan` environments**: Low restrictions, no wait time, allow viewing what will change
-- **`*-apply` environments**: Stronger protections, wait timers, approvals required, restricted to specific branches
-
-This separation helps prevent accidental deployments while still allowing team members to preview changes.
-
-#### 2. Progressive Protection Levels
-
-For ACA deployments, increase protection as you move from development to production:
-
-| Environment | Wait Timer | Approvals | Branch Restrictions | Tag Restrictions |
-|-------------|------------|-----------|---------------------|------------------|
-| Development | None       | Optional  | Minimal             | None             |
-| Staging     | Short      | Required  | Protected branches   | None             |
-| Production  | Longer     | Required  | Protected branches   | Release tags only |
-
-#### 3. Use Proper Approval Workflows
-
-- **Prevent self-review** to ensure changes are verified by another team member
-- **Assign reviewers** who understand the system and deployment impacts
-- **Use teams as reviewers** rather than individuals when possible for better coverage
-- **Document deployment criteria** so reviewers know what to look for
-
-#### 4. Branch and Tag Deployment Policies
-
-For Container Apps, we recommend the following pattern:
-
-- **Development**: Allow feature branches for testing new container images
-- **Staging**: Restrict to main branch or release branches for integration testing
-- **Production**: Restrict to version tags for controlled, versioned deployments
-
-### Security Considerations with OIDC Federation
-
-This module uses OpenID Connect (OIDC) federation to securely connect GitHub Actions with Azure Container Apps. This approach:
-
-1. **Eliminates static credentials** in your GitHub repository 
-2. **Provides temporary, scoped access** to Azure resources
-3. **Leverages Azure RBAC** to limit what each environment can access
-4. **Prevents credential leaks** by using token-based authentication
-5. **Simplifies auditing** by tying actions directly to GitHub identities
-
-This eliminates the need for long-lived service principal secrets and provides a more secure method for authenticating your container deployments.
-
-### Recommended Workflow Configurations
-
-For a practical implementation using the environments created by this module, consider this pattern:
-
-```yaml
-name: Deploy Container App
-
-on:
-  push:
-    branches: [main]
-    tags: ['v*']
-  workflow_dispatch:
-
-jobs:
-  plan:
-    runs-on: ubuntu-latest
-    environment: app-dev-plan  # Lower restrictions for planning
-    permissions:
-      id-token: write
-      contents: read
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      
-      - name: Plan Deployment
-        run: |
-          echo "Planning deployment..."
-          # Planning steps here
-  
-  deploy:
-    needs: plan
-    runs-on: ubuntu-latest
-    environment: app-dev-apply  # Higher restrictions for applying changes
-    permissions:
-      id-token: write
-      contents: read
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      
-      - name: Deploy
-        run: |
-          # Deployment steps here
-```
+For detailed configuration and troubleshooting, see [Dependabot Documentation](.github/DEPENDABOT.md).

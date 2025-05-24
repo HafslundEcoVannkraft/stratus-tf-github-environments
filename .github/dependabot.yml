@@ -1,0 +1,109 @@
+# Dependabot configuration for stratus-tf-aca-gh-vending
+# Automatically updates Terraform providers and GitHub Actions
+# See: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Terraform provider updates
+  - package-ecosystem: "terraform"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Oslo"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "HafslundEcoVannkraft/platform-team"
+    assignees:
+      - "HafslundEcoVannkraft/platform-team"
+    commit-message:
+      prefix: "terraform"
+      prefix-development: "terraform"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "terraform"
+      - "automated"
+    # Group related provider updates together
+    groups:
+      azure-providers:
+        patterns:
+          - "hashicorp/azurerm"
+          - "Azure/azapi"
+        update-types:
+          - "minor"
+          - "patch"
+      github-providers:
+        patterns:
+          - "integrations/github"
+        update-types:
+          - "minor"
+          - "patch"
+      utility-providers:
+        patterns:
+          - "hashicorp/random"
+          - "hashicorp/null"
+          - "hashicorp/time"
+        update-types:
+          - "minor"
+          - "patch"
+    # Only auto-merge patch updates for stable providers
+    auto-merge:
+      dependency-type: "direct"
+      update-type: "security"
+
+  # GitHub Actions updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+      timezone: "Europe/Oslo"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "HafslundEcoVannkraft/platform-team"
+    assignees:
+      - "HafslundEcoVannkraft/platform-team"
+    commit-message:
+      prefix: "github-actions"
+      prefix-development: "github-actions"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "automated"
+    # Group GitHub Actions updates
+    groups:
+      github-actions:
+        patterns:
+          - "actions/*"
+          - "hashicorp/setup-terraform"
+        update-types:
+          - "minor"
+          - "patch"
+    # Auto-merge patch updates for GitHub Actions
+    auto-merge:
+      dependency-type: "direct"
+      update-type: "security"
+
+  # Example files and test dependencies (if any package.json exists)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "first-monday"
+      time: "11:00"
+      timezone: "Europe/Oslo"
+    open-pull-requests-limit: 2
+    reviewers:
+      - "HafslundEcoVannkraft/platform-team"
+    commit-message:
+      prefix: "npm"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "automated"
+    # Only if package.json exists for documentation or testing tools 

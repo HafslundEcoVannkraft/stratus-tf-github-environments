@@ -1,0 +1,162 @@
+name: Dependabot Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  # Validate Terraform configuration
+  terraform-validate:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9.0"
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Check for breaking changes
+        run: |
+          # Check if this is a major version update that might have breaking changes
+          if git diff HEAD~1 version.tf | grep -E '\+.*version.*=.*"~>.*[0-9]+\.0"'; then
+            echo "::warning::Major version update detected. Manual review required."
+            exit 1
+          fi
+
+  # Test example configurations
+  test-examples:
+    name: Test Example Configurations
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate YAML examples
+        run: |
+          # Install yq for YAML validation
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          
+          # Validate all YAML files
+          for file in examples/*.yaml; do
+            echo "Validating $file"
+            yq eval '.' "$file" > /dev/null
+          done
+
+      - name: Check example file syntax
+        run: |
+          # Basic syntax validation for example files
+          python3 -c "
+          import yaml
+          import sys
+          
+          files = ['examples/complete.yaml', 'examples/minmal.yaml']
+          for file in files:
+              try:
+                  with open(file, 'r') as f:
+                      yaml.safe_load(f)
+                  print(f'✓ {file} is valid')
+              except Exception as e:
+                  print(f'✗ {file} is invalid: {e}')
+                  sys.exit(1)
+          "
+
+  # Auto-merge safe updates
+  auto-merge:
+    name: Auto-merge Dependabot PRs
+    runs-on: ubuntu-latest
+    needs: [terraform-validate, test-examples]
+    if: |
+      github.actor == 'dependabot[bot]' &&
+      (
+        contains(github.event.pull_request.labels.*.name, 'dependencies') &&
+        (
+          contains(github.event.pull_request.title, 'patch') ||
+          contains(github.event.pull_request.title, 'security') ||
+          contains(github.event.pull_request.title, 'github-actions')
+        )
+      )
+    
+    steps:
+      - name: Get PR details
+        id: pr-details
+        run: |
+          echo "title=${{ github.event.pull_request.title }}" >> $GITHUB_OUTPUT
+          echo "body=${{ github.event.pull_request.body }}" >> $GITHUB_OUTPUT
+
+      - name: Auto-approve PR
+        run: |
+          gh pr review ${{ github.event.pull_request.number }} --approve --body "Auto-approved by Dependabot workflow after successful validation."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge
+        run: |
+          gh pr merge ${{ github.event.pull_request.number }} --auto --squash --delete-branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add success comment
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body "🤖 **Dependabot Auto-Merge**
+          
+          This PR has been automatically validated and approved:
+          - ✅ Terraform validation passed
+          - ✅ Example configurations validated
+          - ✅ No breaking changes detected
+          
+          The PR will be automatically merged when all required checks pass."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Notify on manual review needed
+  manual-review-needed:
+    name: Manual Review Required
+    runs-on: ubuntu-latest
+    if: |
+      github.actor == 'dependabot[bot]' &&
+      (
+        failure() ||
+        (
+          contains(github.event.pull_request.labels.*.name, 'dependencies') &&
+          contains(github.event.pull_request.title, 'major')
+        )
+      )
+    
+    steps:
+      - name: Add manual review comment
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body "🔍 **Manual Review Required**
+          
+          This Dependabot PR requires manual review because:
+          - Major version update detected, or
+          - Validation tests failed
+          
+          Please review the changes carefully before merging.
+          
+          @HafslundEcoVannkraft/platform-team"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
