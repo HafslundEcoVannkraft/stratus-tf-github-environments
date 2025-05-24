@@ -85,7 +85,7 @@ resource "azurerm_resource_group" "github_identities" {
   tags     = local.common_tags
 
   lifecycle {
-    prevent_destroy = var.environment == "prod"
+    prevent_destroy = false
     ignore_changes = [
       tags["DeploymentDate"] # Ignore deployment date changes on updates
     ]

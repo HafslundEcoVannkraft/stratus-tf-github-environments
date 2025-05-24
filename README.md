@@ -57,7 +57,7 @@ You need just two files in your IaC repository:
    # Create the deployments/github directory if it doesn't exist
    mkdir -p deployments/github
    
-   curl -o deployments/github/github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/minmal.yaml
+   curl -o deployments/github/github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/minimal.yaml
    ```
 
 3. Or use the complete configuration

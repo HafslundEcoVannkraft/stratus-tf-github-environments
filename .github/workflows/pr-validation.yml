@@ -9,6 +9,9 @@ permissions:
   contents: read
   pull-requests: write
   checks: write
+  issues: write  # Required for auto-labeling PRs
+  # Note: 'issues: write' permission would be needed for auto-labeling
+  # If not available, the workflow will suggest labels in a comment instead
 
 jobs:
   # Terraform validation and formatting
@@ -238,16 +241,64 @@ jobs:
       - name: Check file naming conventions
         run: |
           echo "Checking file naming conventions..."
-          # Check for proper file naming (lowercase, hyphens, no spaces)
-          bad_names=$(find . -name "*.tf" -o -name "*.md" -o -name "*.yaml" -o -name "*.yml" | grep -E '[A-Z ]' || true)
-          if [ -n "$bad_names" ]; then
-            echo "❌ Files with improper naming found:"
-            echo "$bad_names"
-            echo "Please use lowercase with hyphens for file names"
+          
+          # Check Terraform files (should be lowercase with hyphens, no spaces)
+          echo "Checking Terraform files..."
+          bad_tf_names=$(find . -name "*.tf" -o -name "*.hcl" | grep -E '[A-Z ]' || true)
+          if [ -n "$bad_tf_names" ]; then
+            echo "❌ Terraform files with improper naming found:"
+            echo "$bad_tf_names"
+            echo "Terraform files must use lowercase with hyphens only"
             exit 1
           else
-            echo "✅ File naming conventions followed"
+            echo "✅ Terraform file naming conventions followed"
           fi
+          
+          # Check YAML/YML files (should be lowercase with hyphens, no spaces)
+          # Exclude GitHub special files that may have different conventions
+          echo "Checking YAML/YML configuration files..."
+          bad_yaml_names=$(find . -name "*.yaml" -o -name "*.yml" | grep -v ".github/" | grep -E '[A-Z ]' || true)
+          if [ -n "$bad_yaml_names" ]; then
+            echo "❌ YAML files with improper naming found:"
+            echo "$bad_yaml_names"
+            echo "YAML files should use lowercase with hyphens only"
+            exit 1
+          else
+            echo "✅ YAML file naming conventions followed"
+          fi
+          
+          # Check GitHub template files (should be lowercase with underscores/hyphens)
+          echo "Checking GitHub template files..."
+          bad_template_names=$(find .github/ISSUE_TEMPLATE/ -name "*.yml" -o -name "*.yaml" 2>/dev/null | while read -r file; do
+            filename=$(basename "$file")
+            if echo "$filename" | grep -qE '[A-Z ]'; then
+              echo "$file"
+            fi
+          done)
+          if [ -n "$bad_template_names" ]; then
+            echo "❌ GitHub template files with improper naming found:"
+            echo "$bad_template_names"
+            echo "GitHub template files should use lowercase with underscores or hyphens"
+            exit 1
+          else
+            echo "✅ GitHub template file naming conventions followed"
+          fi
+          
+          # Check for spaces in any file names (spaces are always problematic)
+          echo "Checking for spaces in file names..."
+          files_with_spaces=$(find . -name "* *" -type f || true)
+          if [ -n "$files_with_spaces" ]; then
+            echo "❌ Files with spaces in names found:"
+            echo "$files_with_spaces"
+            echo "File names should not contain spaces"
+            exit 1
+          else
+            echo "✅ No spaces found in file names"
+          fi
+          
+          # Allow uppercase for GitHub special files (these are conventional)
+          echo "✅ GitHub special files (README.md, CONTRIBUTING.md, CHANGELOG.md, etc.) are allowed to be uppercase"
+          echo "✅ All file naming conventions validated successfully"
 
   # Security checks
   security-validation:
@@ -429,58 +480,92 @@ jobs:
 
       - name: Auto-assign labels
         uses: actions/github-script@v7
+        continue-on-error: true  # Don't fail the workflow if labeling fails
         with:
           script: |
             const { owner, repo } = context.repo;
             const { number } = context.issue;
             
-            // Get changed files
-            const { data: files } = await github.rest.pulls.listFiles({
-              owner,
-              repo,
-              pull_number: number
-            });
-            
-            const labels = [];
-            const changedFiles = files.map(f => f.filename);
-            
-            // Determine labels based on changed files
-            if (changedFiles.some(f => f.endsWith('.tf'))) {
-              labels.push('terraform');
-            }
-            if (changedFiles.some(f => f.includes('README.md') || f.includes('CONTRIBUTING.md'))) {
-              labels.push('documentation');
-            }
-            if (changedFiles.some(f => f.includes('examples/'))) {
-              labels.push('examples');
-            }
-            if (changedFiles.some(f => f.includes('.github/'))) {
-              labels.push('github-actions');
-            }
-            if (changedFiles.some(f => f.includes('version.tf') || f.includes('dependabot'))) {
-              labels.push('dependencies');
-            }
-            
-            // Add size label based on changes
-            const totalChanges = files.reduce((sum, f) => sum + f.changes, 0);
-            if (totalChanges < 10) {
-              labels.push('size/XS');
-            } else if (totalChanges < 30) {
-              labels.push('size/S');
-            } else if (totalChanges < 100) {
-              labels.push('size/M');
-            } else if (totalChanges < 500) {
-              labels.push('size/L');
-            } else {
-              labels.push('size/XL');
-            }
-            
-            // Apply labels
-            if (labels.length > 0) {
-              await github.rest.issues.addLabels({
+            try {
+              // Get changed files
+              const { data: files } = await github.rest.pulls.listFiles({
                 owner,
                 repo,
-                issue_number: number,
-                labels
+                pull_number: number
               });
+              
+              const labels = [];
+              const changedFiles = files.map(f => f.filename);
+              
+              // Determine labels based on changed files
+              if (changedFiles.some(f => f.endsWith('.tf'))) {
+                labels.push('terraform');
+              }
+              if (changedFiles.some(f => f.includes('README.md') || f.includes('CONTRIBUTING.md'))) {
+                labels.push('documentation');
+              }
+              if (changedFiles.some(f => f.includes('examples/'))) {
+                labels.push('examples');
+              }
+              if (changedFiles.some(f => f.includes('.github/'))) {
+                labels.push('github-actions');
+              }
+              if (changedFiles.some(f => f.includes('version.tf') || f.includes('dependabot'))) {
+                labels.push('dependencies');
+              }
+              
+              // Add size label based on changes
+              const totalChanges = files.reduce((sum, f) => sum + f.changes, 0);
+              if (totalChanges < 10) {
+                labels.push('size/XS');
+              } else if (totalChanges < 30) {
+                labels.push('size/S');
+              } else if (totalChanges < 100) {
+                labels.push('size/M');
+              } else if (totalChanges < 500) {
+                labels.push('size/L');
+              } else {
+                labels.push('size/XL');
+              }
+              
+              // Check if labels exist before trying to apply them
+              if (labels.length > 0) {
+                console.log(`Attempting to apply labels: ${labels.join(', ')}`);
+                
+                // Try to apply labels, but handle permission errors gracefully
+                try {
+                  await github.rest.issues.addLabels({
+                    owner,
+                    repo,
+                    issue_number: number,
+                    labels
+                  });
+                  console.log(`✅ Successfully applied labels: ${labels.join(', ')}`);
+                } catch (labelError) {
+                  if (labelError.status === 403) {
+                    console.log(`⚠️ Permission denied for adding labels. This is expected if the GitHub token doesn't have 'issues: write' permission.`);
+                    console.log(`📋 Suggested labels for manual application: ${labels.join(', ')}`);
+                    
+                    // Add a comment with suggested labels instead
+                    try {
+                      await github.rest.issues.createComment({
+                        issue_number: number,
+                        owner,
+                        repo,
+                        body: `## 🏷️ Suggested Labels\n\nThe auto-labeling workflow suggests the following labels for this PR:\n\n${labels.map(label => `- \`${label}\``).join('\n')}\n\n> **Note**: Auto-labeling requires 'issues: write' permission. Please apply these labels manually if desired.`
+                      });
+                      console.log(`✅ Added comment with suggested labels`);
+                    } catch (commentError) {
+                      console.log(`⚠️ Could not add comment with suggested labels: ${commentError.message}`);
+                    }
+                  } else {
+                    throw labelError; // Re-throw if it's not a permission error
+                  }
+                }
+              } else {
+                console.log(`ℹ️ No labels to apply for this PR`);
+              }
+            } catch (error) {
+              console.error(`❌ Auto-labeling failed: ${error.message}`);
+              // Don't throw the error - let the job succeed but log the issue
             } 

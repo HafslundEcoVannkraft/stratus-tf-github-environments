@@ -65,7 +65,7 @@ locals {
   # Read and parse the YAML configuration file
   # This contains the repository and environment definitions
   # If the specified file doesn't exist, fall back to the minimal example
-  yaml_content = fileexists(local.github_env_file) ? file(local.github_env_file) : file("${path.module}/examples/minmal.yaml")
+  yaml_content = fileexists(local.github_env_file) ? file(local.github_env_file) : file("${path.module}/examples/minimal.yaml")
 
   # Parse the YAML content into a Terraform object
   # This is the single source of truth for all configuration data

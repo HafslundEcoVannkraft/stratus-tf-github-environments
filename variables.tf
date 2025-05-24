@@ -70,7 +70,6 @@ variable "state_storage_account_name" {
 variable "github_token" {
   description = "GitHub token with permissions to create and manage environments and secrets."
   type        = string
-  ephemeral   = true
   sensitive   = true
 
   validation {
