@@ -12,17 +12,17 @@
 locals {
   # GitHub API retry configuration (static values only)
   github_api_config = {
-    max_retries = 3
-    retry_delay = "30s"
+    max_retries       = 3
+    retry_delay       = "30s"
     rate_limit_buffer = 10 # Keep 10 requests in reserve
-    batch_size = 20
+    batch_size        = 20
   }
-  
+
   # Computed values based on configuration
   github_api_computed = {
     enable_batching = length(local.environments) > local.github_api_config.batch_size
   }
-  
+
   # Environment batches for large deployments
   environment_batches = local.github_api_computed.enable_batching ? [
     for i in range(0, length(local.environments), local.github_api_config.batch_size) :
@@ -51,7 +51,7 @@ resource "github_repository_environment" "env" {
 
   repository  = each.value.repository
   environment = each.value.environment
-  
+
   # Add wait_timer if present in the configuration
   wait_timer          = try(each.value.wait_timer, 0)
   prevent_self_review = try(each.value.prevent_self_review, false)
@@ -97,16 +97,16 @@ resource "github_repository_environment" "env" {
       # Prevent automatic changes to these fields
       reviewers
     ]
-    
+
     # Add precondition to validate repository exists
     precondition {
-      condition = length(each.value.repository) > 0 && length(each.value.repository) <= 100
+      condition     = length(each.value.repository) > 0 && length(each.value.repository) <= 100
       error_message = "Repository name '${each.value.repository}' must be between 1-100 characters"
     }
-    
+
     # Add precondition to validate environment name
     precondition {
-      condition = can(regex("^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$", each.value.environment))
+      condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$", each.value.environment))
       error_message = "Environment name '${each.value.environment}' must be alphanumeric with hyphens, not starting/ending with hyphen"
     }
   }
@@ -119,16 +119,16 @@ resource "github_repository_environment" "env" {
 # Enhanced wait for environments to be created with better timing
 resource "time_sleep" "wait_for_environment" {
   depends_on = [github_repository_environment.env]
-  
+
   # Dynamic wait time based on number of environments
   create_duration = length(local.environments) > 50 ? "45s" : (
     length(local.environments) > 20 ? "30s" : "15s"
   )
-  
+
   # Add triggers to recreate wait when environments change
   triggers = {
     environment_count = length(local.environments)
-    environment_hash = md5(jsonencode([for env in local.environments : "${env.repository}:${env.environment}"]))
+    environment_hash  = md5(jsonencode([for env in local.environments : "${env.repository}:${env.environment}"]))
   }
 }
 
@@ -168,7 +168,7 @@ resource "github_repository_environment_deployment_policy" "environment_policies
   # Enhanced lifecycle rules to handle GitHub API inconsistencies
   lifecycle {
     create_before_destroy = true
-    
+
     # Add precondition to validate pattern
     precondition {
       condition = length(coalesce(
@@ -177,10 +177,10 @@ resource "github_repository_environment_deployment_policy" "environment_policies
       )) > 0
       error_message = "Branch pattern cannot be empty for environment ${each.value.repository}:${each.value.environment}"
     }
-    
+
     # Add postcondition to verify creation
     postcondition {
-      condition = self.branch_pattern != null
+      condition     = self.branch_pattern != null
       error_message = "Failed to create deployment policy for ${each.value.repository}:${each.value.environment}"
     }
   }
@@ -216,17 +216,17 @@ resource "github_actions_environment_variable" "all_variables" {
     github_repository_environment.env,
     time_sleep.wait_for_environment
   ]
-  
+
   lifecycle {
     # Add precondition to validate variable name
     precondition {
-      condition = can(regex("^[A-Z][A-Z0-9_]*$", each.value.name))
+      condition     = can(regex("^[A-Z][A-Z0-9_]*$", each.value.name))
       error_message = "Variable name '${each.value.name}' must be uppercase with underscores only"
     }
-    
+
     # Add precondition to validate variable value length
     precondition {
-      condition = length(each.value.value) <= 1000
+      condition     = length(each.value.value) <= 1000
       error_message = "Variable value for '${each.value.name}' exceeds 1000 character limit"
     }
   }
@@ -254,17 +254,17 @@ resource "github_actions_environment_secret" "all_secrets" {
     github_repository_environment.env,
     time_sleep.wait_for_environment
   ]
-  
+
   lifecycle {
     # Add precondition to validate secret name
     precondition {
-      condition = can(regex("^[A-Z][A-Z0-9_]*$", each.value.name))
+      condition     = can(regex("^[A-Z][A-Z0-9_]*$", each.value.name))
       error_message = "Secret name '${each.value.name}' must be uppercase with underscores only"
     }
-    
+
     # Add precondition to validate secret value
     precondition {
-      condition = length(each.value.value) > 0 && length(each.value.value) <= 65536
+      condition     = length(each.value.value) > 0 && length(each.value.value) <= 65536
       error_message = "Secret value for '${each.value.name}' must be between 1-65536 characters"
     }
   }

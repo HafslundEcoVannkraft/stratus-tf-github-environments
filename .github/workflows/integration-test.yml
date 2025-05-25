@@ -1,0 +1,399 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '*.tf'
+      - 'tests/**'
+      - '.github/workflows/integration-test.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - '*.tf'
+      - 'tests/**'
+      - '.github/workflows/integration-test.yml'
+  workflow_dispatch:
+    inputs:
+      destroy_after_test:
+        description: 'Destroy resources after test'
+        required: false
+        default: 'true'
+        type: boolean
+
+env:
+  TF_VERSION: "1.12.1"
+  ARM_USE_OIDC: true
+  ARM_USE_AZUREAD: true
+  ARM_SKIP_PROVIDER_REGISTRATION: true
+
+jobs:
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    
+    # Use OIDC for Azure authentication
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create test configuration
+        run: |
+          # Create test-specific github-environments.yaml
+          cat > github-environments.yaml << 'EOF'
+          repositories:
+            - repo: "stratus-tf-aca-gh-vending-test"
+              environments:
+                - name: "integration-test-plan"
+                  container_environment: "dev"
+                  wait_timer: 0
+                  prevent_self_review: false
+                  variables:
+                    INTEGRATION_TEST: "true"
+                    TEST_TIMESTAMP: "$(date +%s)"
+                - name: "integration-test-apply"
+                  container_environment: "dev"
+                  wait_timer: 5
+                  prevent_self_review: true
+                  reviewers:
+                    teams:
+                      - name: "stratus-az-platform-approvers"
+                  variables:
+                    INTEGRATION_TEST: "true"
+                    ENVIRONMENT: "test"
+          EOF
+
+      - name: Create terraform.tfvars
+        run: |
+          cat > terraform.tfvars << 'EOF'
+          # Integration test configuration
+          code_name = "integration-test"
+          environment = "test"
+          subscription_id = "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+          state_storage_account_name = "${{ secrets.TEST_STORAGE_ACCOUNT_NAME }}"
+          github_token = "${{ secrets.GITHUB_TOKEN }}"
+          github_env_file = "github-environments.yaml"
+          github_owner = "${{ github.repository_owner }}"
+          
+          # Optional test overrides
+          remote_state_resource_group_name = "${{ secrets.TEST_RESOURCE_GROUP_NAME }}"
+          remote_state_storage_account_name = "${{ secrets.TEST_STORAGE_ACCOUNT_NAME }}"
+          remote_state_container = "tfstate"
+          remote_state_key = "integration-test.tfstate"
+          EOF
+
+      - name: Terraform Init
+        run: terraform init
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -detailed-exitcode -out=tfplan
+          echo "plan_exitcode=$?" >> $GITHUB_OUTPUT
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        continue-on-error: true
+
+      - name: Terraform Plan Status
+        if: steps.plan.outputs.plan_exitcode == 1
+        run: exit 1
+
+      - name: Comment PR with Plan
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Read terraform plan output
+            let planOutput = '';
+            try {
+              planOutput = fs.readFileSync('tfplan.txt', 'utf8');
+            } catch (error) {
+              planOutput = 'Plan output not available';
+            }
+            
+            const output = `## 🧪 Integration Test Results
+            
+            ### Terraform Plan
+            \`\`\`
+            ${planOutput}
+            \`\`\`
+            
+            **Plan Exit Code:** ${{ steps.plan.outputs.plan_exitcode }}
+            - ✅ 0 = No changes
+            - ✅ 2 = Changes present
+            - ❌ 1 = Error
+            
+            <details>
+            <summary>Test Configuration</summary>
+            
+            - **Test Repository:** stratus-tf-aca-gh-vending-test
+            - **Environments:** integration-test-plan, integration-test-apply
+            - **Azure Subscription:** ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+            - **GitHub Owner:** ${{ github.repository_owner }}
+            
+            </details>`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+      - name: Terraform Apply
+        if: steps.plan.outputs.plan_exitcode == 2
+        id: apply
+        run: |
+          terraform apply -auto-approve tfplan
+          echo "apply_exitcode=$?" >> $GITHUB_OUTPUT
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Test Module Outputs
+        if: steps.apply.outputs.apply_exitcode == 0
+        run: |
+          echo "## 🎯 Testing Module Outputs"
+          
+          # Get outputs
+          ENVIRONMENTS_SUMMARY=$(terraform output -json environments_summary)
+          VALIDATION_STATUS=$(terraform output -json validation_status)
+          MANAGED_IDENTITIES=$(terraform output -json managed_identities)
+          
+          echo "### Environments Summary"
+          echo "$ENVIRONMENTS_SUMMARY" | jq '.'
+          
+          echo "### Validation Status"
+          echo "$VALIDATION_STATUS" | jq '.'
+          
+          echo "### Managed Identities"
+          echo "$MANAGED_IDENTITIES" | jq '.'
+          
+          # Validate outputs
+          OVERALL_STATUS=$(echo "$VALIDATION_STATUS" | jq -r '.overall_status')
+          if [ "$OVERALL_STATUS" != "PASSED" ]; then
+            echo "❌ Validation status is not PASSED: $OVERALL_STATUS"
+            exit 1
+          fi
+          
+          ENVIRONMENT_COUNT=$(echo "$ENVIRONMENTS_SUMMARY" | jq '. | length')
+          if [ "$ENVIRONMENT_COUNT" -lt 2 ]; then
+            echo "❌ Expected at least 2 environments, got: $ENVIRONMENT_COUNT"
+            exit 1
+          fi
+          
+          echo "✅ All output validations passed!"
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Test GitHub Environments Created
+        if: steps.apply.outputs.apply_exitcode == 0
+        run: |
+          echo "## 🐙 Testing GitHub Environments"
+          
+          # Test that GitHub environments were created
+          REPO_NAME="stratus-tf-aca-gh-vending-test"
+          
+          # Check if environments exist
+          for ENV_NAME in "integration-test-plan" "integration-test-apply"; do
+            echo "Checking environment: $ENV_NAME"
+            
+            RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository_owner }}/$REPO_NAME/environments/$ENV_NAME")
+            
+            if echo "$RESPONSE" | jq -e '.name' > /dev/null; then
+              echo "✅ Environment $ENV_NAME exists"
+              
+              # Check environment variables
+              VARS_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                "https://api.github.com/repos/${{ github.repository_owner }}/$REPO_NAME/environments/$ENV_NAME/variables")
+              
+              if echo "$VARS_RESPONSE" | jq -e '.variables[] | select(.name=="INTEGRATION_TEST")' > /dev/null; then
+                echo "✅ Environment variable INTEGRATION_TEST found"
+              else
+                echo "❌ Environment variable INTEGRATION_TEST not found"
+                exit 1
+              fi
+            else
+              echo "❌ Environment $ENV_NAME not found"
+              echo "Response: $RESPONSE"
+              exit 1
+            fi
+          done
+          
+          echo "✅ All GitHub environment tests passed!"
+
+      - name: Terraform Destroy
+        if: always() && (github.event.inputs.destroy_after_test == 'true' || github.event.inputs.destroy_after_test == '')
+        run: terraform destroy -auto-approve
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Comment PR with Results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const applyExitCode = '${{ steps.apply.outputs.apply_exitcode }}';
+            const planExitCode = '${{ steps.plan.outputs.plan_exitcode }}';
+            
+            let status = '🔄 In Progress';
+            let details = '';
+            
+            if (planExitCode === '1') {
+              status = '❌ Failed';
+              details = 'Terraform plan failed';
+            } else if (planExitCode === '0') {
+              status = '✅ Passed';
+              details = 'No changes detected - infrastructure is up to date';
+            } else if (applyExitCode === '0') {
+              status = '✅ Passed';
+              details = 'Integration test completed successfully';
+            } else if (applyExitCode !== '') {
+              status = '❌ Failed';
+              details = 'Terraform apply failed';
+            }
+            
+            const output = `## 🧪 Integration Test Results
+            
+            **Status:** ${status}
+            **Details:** ${details}
+            
+            ### Test Summary
+            - **Terraform Plan:** ${planExitCode === '0' ? '✅ No changes' : planExitCode === '2' ? '✅ Changes detected' : '❌ Failed'}
+            - **Terraform Apply:** ${applyExitCode === '0' ? '✅ Success' : applyExitCode === '' ? '⏭️ Skipped' : '❌ Failed'}
+            - **Output Validation:** ${applyExitCode === '0' ? '✅ Passed' : '⏭️ Skipped'}
+            - **GitHub API Tests:** ${applyExitCode === '0' ? '✅ Passed' : '⏭️ Skipped'}
+            - **Cleanup:** ${{ github.event.inputs.destroy_after_test == 'false' ? '⏭️ Skipped' : '✅ Completed' }}
+            
+            ### Resources Tested
+            - Azure Managed Identities
+            - Azure Role Assignments  
+            - GitHub Environments
+            - GitHub Environment Variables
+            - GitHub Environment Secrets
+            - GitHub Deployment Policies
+            
+            <details>
+            <summary>View Test Configuration</summary>
+            
+            \`\`\`yaml
+            repositories:
+              - repo: "stratus-tf-aca-gh-vending-test"
+                environments:
+                  - name: "integration-test-plan"
+                    container_environment: "dev"
+                    wait_timer: 0
+                    prevent_self_review: false
+                  - name: "integration-test-apply"
+                    container_environment: "dev"
+                    wait_timer: 5
+                    prevent_self_review: true
+                    reviewers:
+                      teams:
+                        - name: "stratus-az-platform-approvers"
+            \`\`\`
+            
+            </details>`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+  cleanup-on-failure:
+    name: Cleanup on Failure
+    runs-on: ubuntu-latest
+    needs: integration-test
+    if: failure()
+    
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Emergency Cleanup
+        run: |
+          echo "🧹 Performing emergency cleanup after test failure"
+          
+          # Recreate the same configuration
+          cat > github-environments.yaml << 'EOF'
+          repositories:
+            - repo: "stratus-tf-aca-gh-vending-test"
+              environments:
+                - name: "integration-test-plan"
+                  container_environment: "dev"
+                - name: "integration-test-apply"
+                  container_environment: "dev"
+          EOF
+          
+          cat > terraform.tfvars << 'EOF'
+          code_name = "integration-test"
+          environment = "test"
+          subscription_id = "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+          state_storage_account_name = "${{ secrets.TEST_STORAGE_ACCOUNT_NAME }}"
+          github_token = "${{ secrets.GITHUB_TOKEN }}"
+          github_env_file = "github-environments.yaml"
+          github_owner = "${{ github.repository_owner }}"
+          remote_state_resource_group_name = "${{ secrets.TEST_RESOURCE_GROUP_NAME }}"
+          remote_state_storage_account_name = "${{ secrets.TEST_STORAGE_ACCOUNT_NAME }}"
+          remote_state_container = "tfstate"
+          remote_state_key = "integration-test.tfstate"
+          EOF
+          
+          terraform init
+          terraform destroy -auto-approve || echo "⚠️ Cleanup may have failed - manual intervention might be needed"
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }} 

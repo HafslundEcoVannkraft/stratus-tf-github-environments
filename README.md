@@ -52,6 +52,10 @@
   - [Common Troubleshooting](#common-troubleshooting)
   - [Recommended Workflow Configurations](#recommended-workflow-configurations)
 - [GitHub Actions Workflow Example](#github-actions-workflow-example)
+- [🧪 **Testing**](#testing)
+  - [🚀 Quick Local Validation](#quick-local-validation)
+  - [🔗 Integration Testing](#integration-testing)
+  - [📋 Test Coverage](#test-coverage)
 
 ## Quick Setup Guide
 
@@ -1340,3 +1344,33 @@ This module uses [Dependabot](.github/DEPENDABOT.md) for automatic dependency up
 - **Utility Providers**: `random`, `null`, `time` grouped together
 
 For detailed configuration and troubleshooting, see [Dependabot Documentation](.github/DEPENDABOT.md).
+
+## 🧪 **Testing**
+
+This module includes comprehensive testing infrastructure:
+
+### **🚀 Quick Local Validation**
+```bash
+# Run local validation (no deployment)
+./scripts/test-local.sh
+```
+
+### **🔗 Integration Testing**
+Real integration tests run automatically via **GitHub Actions** on:
+- Pull requests to `main` branch
+- Pushes to `main` branch
+- Manual workflow dispatch
+
+**Why GitHub Actions?** The module cannot be tested as a child module because:
+- ✅ Provider configurations are defined directly in the module
+- ✅ Import blocks are used (only allowed in root modules)
+- ✅ Backend configuration exists in the module
+
+### **📋 Test Coverage**
+- **Configuration validation**: YAML structure and business rules
+- **Azure resources**: Managed identities and role assignments
+- **GitHub integration**: Environments, variables, secrets, policies
+- **Security validation**: Production controls and reviewer requirements
+- **API validation**: GitHub API confirms resource creation
+
+For detailed testing information, see [`tests/README.md`](tests/README.md).

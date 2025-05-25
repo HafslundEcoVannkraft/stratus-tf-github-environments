@@ -1,50 +1,37 @@
 # 🧪 Testing Guide
 
-This directory contains validation tests for the `stratus-tf-aca-gh-vending` module.
+This directory contains testing infrastructure for the `stratus-tf-aca-gh-vending` module.
 
-## 📋 **Test Overview**
+## 📋 **Test Types**
 
-### **Validation Tests (`validation_test.tf`)**
+### **1. Validation Tests (`validation_test.tf`)**
 - **Purpose**: Test configuration validation logic and business rules
 - **Dependencies**: None (uses mock data and test scenarios)
 - **Speed**: Fast (< 30 seconds)
 - **Use Case**: Development, CI/CD pipelines, configuration validation
+- **Runs**: Locally with `terraform plan/apply`
 
-## 🎯 **What the Tests Cover**
+### **2. Integration Tests (GitHub Actions)**
+- **Purpose**: Test the actual module deployment with real Azure/GitHub resources
+- **Dependencies**: Azure subscription, GitHub token, real infrastructure
+- **Speed**: Slower (5-10 minutes)
+- **Use Case**: Pre-release validation, end-to-end testing
+- **Runs**: Automatically on PRs and pushes via GitHub Actions
 
-### **✅ Configuration Structure**
-- YAML configuration format validation
-- Required fields and structure verification
-- Nested object validation (reviewers, policies, etc.)
+## 🎯 **Why Two Different Approaches?**
 
-### **✅ Naming Conventions**
-- Environment name format validation
-- Repository name format validation
-- Azure resource naming compliance
+**The module cannot be tested as a child module because:**
+- ✅ **Provider configurations** are defined directly in the module
+- ✅ **Import blocks** are used (only allowed in root modules)  
+- ✅ **Backend configuration** exists in the module
 
-### **✅ Security Policies**
-- Production environment security requirements
-- Wait timer limits and validation
-- Reviewer configuration validation
+**Therefore:**
+- **Validation tests** test the logic without calling the module
+- **Integration tests** run the module directly as a root module
 
-### **✅ Policy Conflict Detection**
-- Branch vs tag policy conflicts
-- Mutually exclusive configuration detection
-- GitHub API limitation awareness
+## 🚀 **Running Validation Tests**
 
-### **✅ Variable & Secret Format**
-- GitHub variable naming conventions (UPPERCASE_WITH_UNDERSCORES)
-- Secret naming conventions
-- Value validation (non-empty secrets)
-
-### **✅ Remote State Structure**
-- Expected `github_environment_config` structure
-- Required Azure variables presence
-- Role assignment structure validation
-
-## 🚀 **Running the Tests**
-
-The validation tests are **always safe to run** and don't require any external resources:
+Validation tests use standard Terraform features and work with any version >= 1.3.0:
 
 ```bash
 # Navigate to tests directory
@@ -54,17 +41,21 @@ cd tests
 terraform init
 
 # Run validation tests
-terraform apply -auto-approve
+terraform plan
 
-# View results
-terraform output validation_test_results
+# Apply to see full results
+terraform apply -auto-approve
 ```
 
 **Expected Output:**
 ```json
 {
-  "test_type": "Validation Tests",
-  "test_scope": "Configuration validation without external dependencies",
+  "test_summary": {
+    "total_test_groups": 6,
+    "passed_groups": 5,
+    "failed_groups": 1,
+    "overall_status": "FAILED"
+  },
   "test_coverage": {
     "yaml_structure": "✅ YAML configuration structure validation",
     "naming_validation": "✅ Naming convention validation", 
@@ -76,19 +67,106 @@ terraform output validation_test_results
 }
 ```
 
+## 🔗 **Running Integration Tests**
+
+Integration tests run automatically via GitHub Actions but can also be triggered manually.
+
+### **Automatic Triggers:**
+- **Pull Requests** to `main` branch
+- **Pushes** to `main` branch  
+- **File changes** in `*.tf`, `tests/**`, or workflow files
+
+### **Manual Trigger:**
+1. Go to **Actions** tab in GitHub
+2. Select **Integration Tests** workflow
+3. Click **Run workflow**
+4. Choose whether to destroy resources after test (default: true)
+
+### **Required Secrets:**
+Configure these in your repository settings:
+
+| Secret Name | Description | Example |
+|-------------|-------------|---------|
+| `AZURE_CLIENT_ID` | Azure Service Principal Client ID | `12345678-1234-1234-1234-123456789012` |
+| `AZURE_TENANT_ID` | Azure Tenant ID | `87654321-4321-4321-4321-210987654321` |
+| `AZURE_SUBSCRIPTION_ID` | Azure Subscription ID | `11111111-2222-3333-4444-555555555555` |
+| `TEST_STORAGE_ACCOUNT_NAME` | Storage account for test state | `teststorageaccount` |
+| `TEST_RESOURCE_GROUP_NAME` | Resource group for test resources | `test-rg` |
+
+### **What Integration Tests Do:**
+
+1. **🏗️ Setup Phase:**
+   - Create test `github-environments.yaml` configuration
+   - Create test `terraform.tfvars` with test values
+   - Authenticate with Azure using OIDC
+
+2. **🧪 Test Phase:**
+   - Run `terraform init`, `validate`, `plan`
+   - Apply the module to create real resources
+   - Validate module outputs (environments, identities, roles)
+   - Test GitHub API to verify environments were created
+   - Verify environment variables and secrets
+
+3. **🧹 Cleanup Phase:**
+   - Destroy all created resources
+   - Emergency cleanup on failure
+
+### **Test Configuration:**
+
+The integration tests use this configuration:
+
+```yaml
+repositories:
+  - repo: "stratus-tf-aca-gh-vending-test"
+    environments:
+      - name: "integration-test-plan"
+        container_environment: "dev"
+        wait_timer: 0
+        prevent_self_review: false
+        variables:
+          INTEGRATION_TEST: "true"
+          TEST_TYPE: "plan"
+      - name: "integration-test-apply"
+        container_environment: "dev"
+        wait_timer: 5
+        prevent_self_review: true
+        reviewers:
+          teams:
+            - name: "stratus-az-platform-approvers"
+        variables:
+          INTEGRATION_TEST: "true"
+          TEST_TYPE: "apply"
+```
+
+## 🎯 **What Each Test Type Validates**
+
+### **Validation Tests:**
+- ✅ **Configuration structure**: YAML format and required fields
+- ✅ **Naming conventions**: Environment and repository naming
+- ✅ **Security policies**: Production environment requirements
+- ✅ **Policy conflicts**: Branch vs tag policy conflicts
+- ✅ **Variable format**: GitHub variable/secret naming
+- ✅ **Remote state structure**: Expected output format
+
+### **Integration Tests:**
+- ✅ **Module execution**: Terraform init, plan, apply succeed
+- ✅ **Azure resources**: Managed identities and role assignments created
+- ✅ **GitHub integration**: Environments, variables, secrets configured
+- ✅ **Output validation**: Module outputs have expected structure
+- ✅ **API validation**: GitHub API confirms resource creation
+- ✅ **Cleanup**: All resources properly destroyed
+
 ## 🔧 **Understanding Test Results**
 
-### **✅ Passing Tests**
+### **✅ Validation Test Results**
 - **Green checkmarks** indicate validation rules are working correctly
-- Tests validate both positive cases (valid configs) and negative cases (invalid configs)
+- **⚠️ Expected failures** show conflict detection is working
+- **❌ Actual failures** indicate issues with validation logic
 
-### **⚠️ Expected Failures**
-- **Policy conflicts test** is designed to fail when it detects conflicting configurations
-- This demonstrates the validation logic is working correctly
-
-### **❌ Actual Failures**
-- If other tests fail, there may be issues with the validation logic
-- Check the test output for specific failure details
+### **✅ Integration Test Results**
+- **GitHub Actions** provides detailed logs and status
+- **PR comments** show test results and configuration
+- **Failed tests** include error details and cleanup status
 
 ## 🛠 **Development Workflow**
 
@@ -102,7 +180,7 @@ terraform output validation_test_results
 
 ### **Before Committing:**
 ```bash
-# Ensure all validation tests pass
+# Ensure validation tests pass
 cd tests
 terraform apply -auto-approve
 
@@ -110,129 +188,65 @@ terraform apply -auto-approve
 terraform output validation_test_results
 ```
 
-### **In CI/CD:**
-```bash
-# Add to your CI pipeline
-cd tests
-terraform init
-terraform apply -auto-approve
-```
+### **Before Merging PR:**
+- ✅ **Validation tests** pass locally
+- ✅ **Integration tests** pass in GitHub Actions
+- ✅ **PR comments** show successful test results
 
-## 📝 **Test Data**
+## 📝 **Test Files**
 
-The tests use three main test configurations:
+### **Validation Tests:**
+- `validation_test.tf` - Main validation logic
+- `test-github-environments.yaml` - Example configuration
 
-### **1. Valid Minimal Configuration**
-```yaml
-repositories:
-  - repo: "test-repo"
-    environments:
-      - name: "dev"
-        container_environment: "dev"
-```
+### **Integration Tests:**
+- `.github/workflows/integration-test.yml` - GitHub Actions workflow
+- `integration-github-environments.yaml` - Comprehensive test configuration
 
-### **2. Valid Comprehensive Configuration**
-```yaml
-repositories:
-  - repo: "test-repo-comprehensive"
-    environments:
-      - name: "dev-plan"
-        container_environment: "dev"
-        wait_timer: 0
-        prevent_self_review: false
-        reviewers:
-          users: [{ username: "test-user" }]
-          teams: [{ name: "test-team" }]
-        deployment_branch_policy:
-          protected_branches: false
-          custom_branch_policies: true
-          custom_branches: ["main", "develop"]
-        variables:
-          TEST_VAR: "test-value"
-          DEBUG_MODE: "true"
-        secrets:
-          - name: "TEST_SECRET"
-            value: "secret-value"
-```
-
-### **3. Invalid Configuration (Conflicting Policies)**
-```yaml
-repositories:
-  - repo: "test-repo-invalid"
-    environments:
-      - name: "conflicting-env"
-        container_environment: "dev"
-        deployment_branch_policy:
-          protected_branches: true
-        deployment_tag_policy:
-          enabled: true
-          tag_patterns: ["v*"]
-```
+### **Documentation:**
+- `README.md` - This testing guide
 
 ## 🔧 **Troubleshooting**
 
-### **Tests Not Running:**
-- Check Terraform version (requires >= 1.6.0)
-- Verify test provider is available: `terraform providers`
+### **Validation Tests Not Running:**
+- Check Terraform version (requires >= 1.3.0)
 - Ensure you're in the `tests/` directory
+- Run `terraform init` if providers are missing
 
-### **Unexpected Test Failures:**
-- Review the specific test assertion that failed
-- Check if validation logic in the main module changed
-- Verify test data matches expected format
+### **Integration Tests Failing:**
+
+**Authentication Issues:**
+- Verify Azure service principal has correct permissions
+- Check GitHub token has required scopes (`repo`, `workflow`, `read:org`)
+- Ensure OIDC is configured correctly
+
+**Resource Issues:**
+- Check Azure subscription limits
+- Verify test resource group exists
+- Ensure storage account is accessible
+
+**GitHub API Issues:**
+- Verify repository `stratus-tf-aca-gh-vending-test` exists
+- Check GitHub token permissions
+- Ensure team `stratus-az-platform-approvers` exists
 
 ### **Adding New Tests:**
+
+**For Validation Tests:**
 1. Add new test scenarios to `locals.test_configs`
-2. Create new `test_assertions` resource
-3. Add test coverage to output
-4. Update this README with new test descriptions
+2. Create new validation logic
+3. Add new `check` blocks
+4. Update documentation
 
-## 🎯 **Integration Testing**
-
-For **real integration testing** with actual Azure/GitHub resources:
-
-1. **Use the module directly** in a test environment
-2. **Create test tfvars** with real subscription/token values
-3. **Run terraform apply** in a dedicated test directory
-4. **Verify resources** are created correctly in Azure/GitHub
-5. **Clean up** with `terraform destroy`
-
-**Example integration test setup:**
-```bash
-# Create test directory
-mkdir integration-test
-cd integration-test
-
-# Create test configuration
-cat > main.tf << EOF
-module "test" {
-  source = "../"
-  
-  code_name                  = "test"
-  environment               = "integration"
-  subscription_id           = var.test_subscription_id
-  state_storage_account_name = var.test_storage_account
-  github_token              = var.test_github_token
-  github_env_file           = "test-environments.yaml"
-}
-EOF
-
-# Create test variables
-cat > terraform.tfvars << EOF
-test_subscription_id = "your-subscription-id"
-test_storage_account = "yourstorageaccount"
-test_github_token = "your-github-token"
-EOF
-
-# Run integration test
-terraform init
-terraform apply
-terraform destroy  # Clean up
-```
+**For Integration Tests:**
+1. Modify `integration-github-environments.yaml`
+2. Update GitHub Actions workflow
+3. Add new validation steps
+4. Test manually first
 
 ## 📚 **Related Documentation**
 
-- [Terraform Testing](https://developer.hashicorp.com/terraform/language/tests)
 - [Module Development](../README.md)
 - [Contributing Guide](../CONTRIBUTING.md)
-- [Troubleshooting Guide](../TROUBLESHOOTING.md) 
+- [Troubleshooting Guide](../TROUBLESHOOTING.md)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions) 

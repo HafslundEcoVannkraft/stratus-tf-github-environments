@@ -1,0 +1,61 @@
+repositories:
+  - repo: "stratus-tf-aca-gh-vending-test"
+    environments:
+      # Test environment for plan operations
+      - name: "integration-test-plan"
+        container_environment: "dev"
+        wait_timer: 0
+        prevent_self_review: false
+        variables:
+          INTEGRATION_TEST: "true"
+          TEST_TYPE: "plan"
+          AZURE_REGION: "norwayeast"
+        secrets:
+          - name: "TEST_SECRET"
+            value: "integration-test-secret-value"
+        deployment_branch_policy:
+          protected_branches: false
+          custom_branch_policies: true
+          custom_branches: ["main", "develop", "integration-test"]
+
+      # Test environment for apply operations with security controls
+      - name: "integration-test-apply"
+        container_environment: "dev"
+        wait_timer: 5
+        prevent_self_review: true
+        reviewers:
+          teams:
+            - name: "stratus-az-platform-approvers"
+          users:
+            - username: "github-actions[bot]"
+        variables:
+          INTEGRATION_TEST: "true"
+          TEST_TYPE: "apply"
+          ENVIRONMENT: "test"
+          AZURE_REGION: "norwayeast"
+        secrets:
+          - name: "TEST_SECRET"
+            value: "integration-test-apply-secret"
+          - name: "DEPLOYMENT_KEY"
+            value: "test-deployment-key-value"
+        deployment_tag_policy:
+          enabled: true
+          tag_patterns: ["v*", "release-*", "test-*"]
+
+      # Test environment with minimal configuration
+      - name: "integration-test-minimal"
+        container_environment: "dev"
+        variables:
+          MINIMAL_TEST: "true"
+
+      # Test environment with maximum wait timer
+      - name: "integration-test-max-wait"
+        container_environment: "dev"
+        wait_timer: 43200  # 12 hours - maximum allowed
+        prevent_self_review: true
+        reviewers:
+          teams:
+            - name: "stratus-az-platform-approvers"
+        variables:
+          MAX_WAIT_TEST: "true"
+          WAIT_TIMER: "43200" 
