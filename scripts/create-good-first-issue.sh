@@ -2,6 +2,7 @@
 
 # Helper script to create good first issues from the predefined list
 # Usage: ./scripts/create-good-first-issue.sh [issue_number]
+# Purpose: Maintainer tool for creating beginner-friendly contribution opportunities
 
 set -e
 
@@ -13,10 +14,38 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Show help if requested
+if [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
+    echo -e "${BLUE}🌟 Good First Issue Creator${NC}"
+    echo ""
+    echo -e "${CYAN}PURPOSE:${NC}"
+    echo "This script helps maintainers create predefined, beginner-friendly issues"
+    echo "for new contributors. It focuses on safe, guided tasks that help people"
+    echo "learn the codebase without risk of breaking anything."
+    echo ""
+    echo -e "${CYAN}USAGE:${NC}"
+    echo "  ./scripts/create-good-first-issue.sh [issue_number]"
+    echo "  ./scripts/create-good-first-issue.sh --help"
+    echo ""
+    echo -e "${CYAN}EXAMPLES:${NC}"
+    echo "  ./scripts/create-good-first-issue.sh 1    # Create issue #1 (fix typos)"
+    echo "  ./scripts/create-good-first-issue.sh      # Interactive mode"
+    echo ""
+    echo -e "${CYAN}LOOKING FOR SOMETHING ELSE?${NC}"
+    echo "• 🐛 Bug reports: Use GitHub issue templates"
+    echo "• ✨ Feature requests: Use GitHub issue templates"
+    echo "• ❓ Questions: Check our Support documentation"
+    echo "• 📚 Documentation: Check CONTRIBUTING.md"
+    echo ""
+    echo -e "${YELLOW}This script is specifically for maintainers creating beginner tasks.${NC}"
+    exit 0
+fi
+
 echo -e "${BLUE}🌟 Good First Issue Creator${NC}"
-echo "This script helps you create beginner-friendly issues for new contributors."
+echo -e "${CYAN}Maintainer tool for creating beginner-friendly contribution opportunities${NC}"
 echo ""
 
 # Check if gh CLI is installed
@@ -205,5 +234,13 @@ gh issue create \
 
 echo ""
 echo -e "${GREEN}✅ Issue created successfully!${NC}"
+echo ""
 echo -e "${BLUE}🔗 View all good first issues:${NC}"
-echo "https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22" 
+echo "https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22"
+echo ""
+echo -e "${CYAN}💡 Need to create other types of issues?${NC}"
+echo "• 🐛 Bug reports: https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues/new?template=bug-report.yml"
+echo "• ✨ Feature requests: https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues/new?template=feature-request.yml"
+echo "• 🌟 More good first issues: Use this script again!"
+echo ""
+echo -e "${YELLOW}This script focuses on beginner-friendly tasks to welcome new contributors.${NC}" 
