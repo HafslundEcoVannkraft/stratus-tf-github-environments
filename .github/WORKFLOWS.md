@@ -2,51 +2,40 @@
 
 This repository uses GitHub Actions to automate quality assurance, dependency management, and validation processes.
 
-## 🔄 Pull Request Validation
+## 🔄 **Pull Request Validation** (`pr-validation.yml`)
 
 **File**: [`.github/workflows/pr-validation.yml`](workflows/pr-validation.yml)
 
-**Triggers**: Pull requests to `main` or `develop` branches
+**Purpose**: Community-friendly validation that ensures essential quality standards while being welcoming to new contributors.
 
-**Purpose**: Comprehensive validation of all changes before they can be merged.
+**Triggers**:
+- Pull requests to `main` or `develop` branches
+- On opened, synchronize, or reopened events
 
-### Validation Jobs
+**Key Features**:
+- **Essential validation only**: Focuses on must-have checks (Terraform syntax, YAML validation)
+- **Helpful feedback**: Provides clear guidance instead of cryptic error messages
+- **Community-friendly**: Warnings instead of failures where appropriate
+- **Auto-labeling**: Automatically suggests helpful labels for organization
 
-| Job | Purpose | What It Checks |
+**Jobs**:
+
+| Job | Purpose | Failure Impact |
 |-----|---------|----------------|
-| **Terraform Validation** | Code quality | Format, initialization, validation |
-| **YAML Validation** | Configuration files | Syntax, schema structure |
-| **Documentation Validation** | Content consistency | Broken links, missing updates |
-| **Code Quality** | Standards compliance | TODO comments, debugging code, naming |
-| **Security Validation** | Security patterns | Sensitive data, version constraints |
-| **Commit Validation** | Message format | Conventional commits compliance |
+| **Essential Checks** | Terraform format, init, validate + YAML syntax | ❌ Blocks merge |
+| **Auto Label** | Suggests helpful labels based on changed files | ⚠️ Advisory only |
 
-### Automated Features
+**What it validates**:
+- ✅ **Terraform syntax**: Format, initialization, validation
+- ✅ **YAML structure**: Syntax and basic schema validation  
+- ✅ **Security awareness**: Scans for obvious sensitive information (advisory)
+- ✅ **Examples**: Validates YAML examples if changed
 
-- **📊 Status Comments**: Detailed results posted to PR
-- **🏷️ Auto-Labeling**: Labels applied based on changed files
-- **📋 Summary Dashboard**: Overall status and next steps
-- **🔗 Helpful Links**: Direct links to contributing guidelines
-
-### Example PR Comment
-
-```markdown
-## 📋 Pull Request Validation Summary
-
-🎉 All checks passed!
-
-| Check | Status |
-|-------|--------|
-| Terraform Validation | ✅ success |
-| YAML Validation | ✅ success |
-| Documentation Validation | ✅ success |
-| Code Quality | ✅ success |
-| Security Validation | ✅ success |
-| Commit Validation | ✅ success |
-
-### ✅ Ready for Review
-All automated checks have passed. This PR is ready for human review.
-```
+**Community Benefits**:
+- **Beginner-friendly**: Clear error messages with actionable guidance
+- **Fast feedback**: Essential checks only, no overwhelming validation
+- **Helpful automation**: Auto-suggests labels and provides guidance
+- **Encouraging**: Celebrates successes and guides improvements
 
 ## 🤖 Dependabot Auto-Merge
 
@@ -107,16 +96,38 @@ No sensitive environment variables are required. All workflows use:
 
 No additional secrets required beyond GitHub's default `GITHUB_TOKEN`.
 
-## 🔧 Customization
+## �� Customization
 
-### Adding New Validation
+### **Adding New Validation Checks**
 
-To add new validation steps:
+To add new validation to the PR workflow:
 
-1. **Add job** to `pr-validation.yml`
-2. **Update summary** in `pr-summary` job
-3. **Update documentation** in this file
-4. **Test thoroughly** with sample PR
+1. **Add step** to the `essential-validation` job in `pr-validation.yml`
+2. **Keep it simple**: Focus on essential checks that help contributors
+3. **Provide guidance**: Include helpful error messages and next steps
+4. **Test thoroughly**: Ensure new checks don't create barriers for beginners
+
+### **Key Principles**:
+- **Community-first**: Prioritize contributor experience over comprehensive validation
+- **Essential only**: Only validate what's truly necessary for code quality
+- **Helpful feedback**: Every error should include actionable guidance
+- **Graceful degradation**: Prefer warnings over failures where possible
+
+### **Example: Adding a New Check**
+
+```yaml
+- name: Check for common issues
+  run: |
+    echo "Checking for common configuration issues..."
+    # Your validation logic here
+    if [ "$issue_found" = true ]; then
+      echo "⚠️ Issue found: [description]"
+      echo "💡 To fix: [specific guidance]"
+      echo "📚 More info: [link to documentation]"
+    else
+      echo "✅ No issues found"
+    fi
+```
 
 ### Modifying Auto-Merge
 
