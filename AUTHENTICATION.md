@@ -1,23 +1,53 @@
 # 🔐 Authentication Guide
 
-This guide explains how to authenticate with GitHub for the `stratus-tf-aca-gh-vending` module.
+This is the **comprehensive authentication guide** for the `stratus-tf-aca-gh-vending` module. This guide covers all authentication methods, security considerations, and troubleshooting.
+
+> **📚 Related Documentation:**
+> - [README.md](./README.md) - Quick setup and usage examples
+> - [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - Common issues and solutions
+> - [AI_CONTEXT.md](./AI_CONTEXT.md) - Context for AI-assisted development
+
+## 📋 **Table of Contents**
+
+- [🎯 Recommended: GitHub CLI Authentication](#-recommended-github-cli-authentication)
+- [🤔 GitHub CLI vs GitHub App: When to Use What?](#-github-cli-vs-github-app-when-to-use-what)
+- [🔧 Setup GitHub CLI Authentication](#-setup-github-cli-authentication)
+- [🔄 Managing Multiple Accounts](#-managing-multiple-accounts)
+- [🛠 Troubleshooting Authentication](#-troubleshooting-authentication)
+- [🔒 Security Best Practices](#-security-best-practices)
+- [🔑 Alternative: Personal Access Tokens](#-alternative-personal-access-tokens)
+- [🤖 GitHub App Authentication (Enterprise)](#-github-app-authentication-enterprise)
 
 ## 🎯 **Recommended: GitHub CLI Authentication**
 
 GitHub CLI authentication is the **recommended approach** for security, convenience, and reliability.
 
-### **Why GitHub CLI is Better**
+## 🤔 **GitHub CLI vs GitHub App: When to Use What?**
 
-| Feature | GitHub CLI | Personal Access Token |
-|---------|------------|----------------------|
-| **Expiration** | ✅ Never expires | ❌ Can expire (max 1 year) |
-| **Scope Management** | ✅ Automatic | ❌ Manual configuration |
-| **Security** | ✅ OAuth flow | ❌ Long-lived secrets |
-| **Rotation** | ✅ Easy (`gh auth refresh`) | ❌ Manual regeneration |
-| **Multi-account** | ✅ Built-in switching | ❌ Manual token management |
-| **Terraform Integration** | ✅ Automatic detection | ❌ Manual configuration |
+### **🎯 Stratus Default: GitHub CLI Tokens (Recommended)**
 
-### **Setup GitHub CLI Authentication**
+**For most Stratus teams, use GitHub CLI tokens because:**
+- **One-time setup**: Configuring GitHub environments is typically a one-time task per project
+- **No approval overhead**: GitHub Apps require manual workflow to order app and private key from administrators
+- **Immediate access**: `gh auth login` and you're ready to go
+- **Perfect for occasional use**: Most teams configure environments once and rarely change them
+
+### **🏢 GitHub Apps: For Special Requirements**
+
+**Consider GitHub Apps only if your team:**
+- **Creates/destroys environments frequently** (multiple times per week)
+- **Has specific compliance requirements** for app-based authentication
+- **Already has GitHub Apps** set up for other purposes
+
+**Note**: The workflow supports GitHub App authentication, and we use it for module testing, but it's not the default recommendation for regular Stratus teams.
+
+### **💡 Quick Decision**
+
+- **Most Stratus teams** → Use GitHub CLI tokens (default pattern)
+- **High-frequency environment changes** → Consider GitHub Apps
+- **Compliance requirements** → GitHub Apps may be required
+
+## 🔧 **Setup GitHub CLI Authentication**
 
 #### **1. Install GitHub CLI**
 
@@ -100,15 +130,19 @@ export GITHUB_TOKEN=$(gh auth token)
 terraform apply
 ```
 
-### **Using in GitHub Actions Workflows**
+### **Using GitHub CLI to Dispatch Workflows**
 
-```yaml
-# In your workflow file
-- name: Run Terraform
-  run: |
-    gh workflow run your-workflow.yml \
-      -f github_token=$(gh auth token) \
-      -f tfvars_file=environments.yaml
+```bash
+# Dispatch the vending workflow from your terminal
+gh workflow run github-environment-aca.yml \
+  -f github_token=$(gh auth token) \
+  -f tfvars_file=dev.tfvars
+
+# Check workflow status
+gh run list --workflow=github-environment-aca.yml
+
+# View workflow logs
+gh run view --log
 ```
 
 ## 🔑 **Alternative: Personal Access Tokens**
@@ -261,9 +295,24 @@ curl -H "Authorization: token $(gh auth token)" \
 
 1. **Use web browser authentication** for the most secure flow
 2. **Enable 2FA** on your GitHub account
-3. **Regularly refresh tokens**: `gh auth refresh`
+3. **Periodic token refresh**: Run `gh auth refresh` monthly for security hygiene
 4. **Use organization SSO** if available
 5. **Monitor token usage** in GitHub settings
+6. **Secure workstation practices**:
+   - **Lock your screen** when away from your workstation
+   - **Use full disk encryption** on development machines
+   - **Keep OS and software updated** with security patches
+7. **Network security**:
+   - **Avoid public WiFi** for sensitive operations
+   - **Use VPN** when working remotely
+8. **Session management**:
+   - **Logout when switching contexts**: `gh auth logout` when switching between personal/work accounts
+   - **Logout on shared machines**: Always `gh auth logout` on shared or temporary workstations
+   - **Regular security reviews**: Check `gh auth status` and GitHub's "Applications" settings quarterly
+9. **Emergency procedures**:
+   - **Immediate logout** if you suspect compromise: `gh auth logout`
+   - **Revoke all tokens** in GitHub settings if needed
+   - **Report security incidents** to your organization's security team
 
 ### **Personal Access Token Security**
 
@@ -277,20 +326,175 @@ curl -H "Authorization: token $(gh auth token)" \
 ### **Environment Security**
 
 ```bash
-# Never commit tokens to version control
-echo "GITHUB_TOKEN=*" >> .gitignore
+# ✅ Protect sensitive files
+echo ".env" >> .gitignore
+echo ".env.local" >> .gitignore
+echo "*.env" >> .gitignore
+echo "*.token" >> .gitignore
+echo "secrets/" >> .gitignore
 
-# Use environment variables
+# Use environment variables (not files)
 export GITHUB_TOKEN=$(gh auth token)
 
 # Clear tokens after use
 unset GITHUB_TOKEN
 ```
 
-## 📚 **Additional Resources**
+## 🤖 **GitHub App Authentication (Enterprise)**
 
-- [GitHub CLI Manual](https://cli.github.com/manual/)
-- [GitHub CLI Authentication](https://cli.github.com/manual/gh_auth)
-- [Personal Access Tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)
-- [Fine-grained Personal Access Tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-fine-grained-personal-access-token)
-- [Token Expiration and Revocation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/token-expiration-and-revocation) 
+For enterprise environments and automated testing, GitHub App authentication provides enhanced security and better audit trails.
+
+### **Benefits of GitHub App Authentication**
+
+- **🔐 Enhanced Security**: Fine-grained permissions and automatic token expiration
+- **📊 Better Audit Trails**: All actions logged under the app's identity
+- **🏢 Organization Control**: Admins control app installations and permissions
+- **⏰ Automatic Expiration**: Installation tokens expire in 1 hour
+- **🔄 No Personal Dependencies**: Not tied to individual user accounts
+
+### **Setup GitHub App**
+
+#### **1. Create GitHub App**
+
+1. Go to GitHub Settings → Developer settings → GitHub Apps
+2. Click "New GitHub App"
+3. Configure basic information:
+   - **App name**: `stratus-aca-vending-app`
+   - **Homepage URL**: Your organization's URL
+   - **Webhook URL**: Not required for this use case
+
+#### **2. Set Permissions**
+
+**Repository permissions:**
+- **Actions**: Write (to dispatch workflows)
+- **Contents**: Read (to read repository files)
+- **Environments**: Write (to create and manage environments)
+- **Metadata**: Read (required for basic repository access)
+- **Secrets**: Write (to manage environment secrets)
+- **Variables**: Write (to manage environment variables)
+
+**Organization permissions:**
+- **Members**: Read (to validate team and user assignments)
+
+#### **3. Generate Private Key**
+
+1. In your GitHub App settings, scroll to "Private keys"
+2. Click "Generate a private key"
+3. Download and securely store the `.pem` file
+
+#### **4. Install App**
+
+1. Go to your GitHub App settings
+2. Click "Install App" in the left sidebar
+3. Install in your organization
+4. Grant access to required repositories
+
+### **Using GitHub App in Integration Tests**
+
+The enhanced integration test workflow uses GitHub App authentication:
+
+```yaml
+# In .github/workflows/integration-test.yml
+- name: Generate GitHub App Token
+  id: app-token
+  uses: actions/create-github-app-token@v1
+  with:
+    app-id: ${{ secrets.GITHUB_APP_ID }}
+    private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+    owner: ${{ github.repository_owner }}
+
+- name: Use App Token
+  run: |
+    gh workflow run github-environment-aca.yml \
+      -f github_token="${{ steps.app-token.outputs.token }}" \
+      -f tfvars_file=integration-test.tfvars
+```
+
+### **Required Secrets**
+
+Add these secrets to your repository:
+
+```bash
+# GitHub App ID (found in app settings)
+GITHUB_APP_ID=123456
+
+# GitHub App Private Key (contents of the .pem file)
+GITHUB_APP_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----
+...
+-----END RSA PRIVATE KEY-----
+```
+
+### **Manual Token Generation**
+
+For local testing or manual workflows:
+
+```bash
+#!/bin/bash
+# generate-app-token.sh
+
+APP_ID="your-app-id"
+INSTALLATION_ID="your-installation-id"  # Found in app installations
+PRIVATE_KEY_PATH="path/to/private-key.pem"
+
+# Generate JWT token (requires python3 and PyJWT)
+JWT=$(python3 -c "
+import jwt
+import time
+from pathlib import Path
+
+app_id = '$APP_ID'
+private_key = Path('$PRIVATE_KEY_PATH').read_text()
+
+payload = {
+    'iat': int(time.time()),
+    'exp': int(time.time()) + 600,  # 10 minutes
+    'iss': app_id
+}
+
+token = jwt.encode(payload, private_key, algorithm='RS256')
+print(token)
+")
+
+# Get installation token
+INSTALLATION_TOKEN=$(curl -s -X POST \
+  -H "Authorization: Bearer $JWT" \
+  -H "Accept: application/vnd.github.v3+json" \
+  "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | \
+  jq -r '.token')
+
+# Use with GitHub CLI
+echo "$INSTALLATION_TOKEN" | gh auth login --with-token
+```
+
+### **Integration Test Features**
+
+The enhanced integration test now provides:
+
+- **🔐 GitHub App Authentication**: Tests both GitHub App and standard token authentication
+- **🚀 Real Workflow Dispatch**: Actually runs the `github-environment-aca.yml` workflow
+- **⏱️ Workflow Monitoring**: Waits for and monitors the dispatched workflow completion
+- **✅ End-to-End Verification**: Verifies GitHub environments were actually created
+- **🧹 Automatic Cleanup**: Dispatches destroy workflow for cleanup
+- **📊 Comprehensive Reporting**: Detailed test results and workflow links
+
+### **Security Considerations**
+
+#### **Private Key Management**
+- **🔒 Never commit private keys** to repositories
+- **🏦 Use secure storage** (Azure Key Vault, GitHub Secrets, etc.)
+- **🔄 Rotate keys regularly** following security policies
+- **👥 Limit access** to private keys
+
+#### **Installation Security**
+- **🎯 Limit repository access** to only required repositories
+- **👀 Monitor app usage** through GitHub's audit logs
+- **🔍 Regular permission reviews** to ensure least privilege
+- **🚨 Immediate revocation** if compromise is suspected
+
+#### **Token Handling**
+- **⏰ Short-lived tokens**: Installation tokens expire in 1 hour
+- **🔐 Secure transmission**: Use HTTPS and secure environment variables
+- **📝 Audit logging**: All API calls are logged under the app's identity
+- **🚫 No persistent storage**: Tokens should not be stored long-term
+
+This GitHub App approach provides enterprise-grade security while enabling comprehensive integration testing of the entire workflow.

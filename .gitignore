@@ -229,6 +229,9 @@ ENV/
 # Go (if using for tooling)
 vendor/
 
+# Exclude PRDETAILS.md
+PRDETAILS.md
+
 # -----------------------------------------------------------------------------
 # EXCEPTIONS - Files to INCLUDE despite patterns above
 # -----------------------------------------------------------------------------
@@ -244,3 +247,6 @@ vendor/
 
 # Include specific documentation
 !docs/README.md
+
+
+

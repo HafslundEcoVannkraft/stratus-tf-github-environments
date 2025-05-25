@@ -263,12 +263,10 @@ output "validation_status" {
         environments_valid   = local.validation_results.yaml_environments_valid
         no_duplicates        = local.validation_results.no_duplicate_environments
         container_envs_valid = local.validation_results.container_environments_valid
-        reviewers_valid      = local.validation_results.reviewers_valid
       }
       remote_state = {
         accessible                        = local.validation_results.remote_state_accessible
         github_environment_config_present = local.validation_results.github_environment_config_present
-        role_assignments_valid            = local.validation_results.role_assignments_valid
       }
       minimum_requirements = local.minimum_deployment_requirements
     }

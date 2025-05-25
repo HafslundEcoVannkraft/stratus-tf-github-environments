@@ -136,22 +136,21 @@
                   }
                 },
                 "secrets": {
-                  "type": "array",
-                  "description": "Secrets to create for this environment",
-                  "items": {
+                  "type": "object",
+                  "description": "Secrets to create for this environment. Each key is the secret name, value is an object with key_vault_name and secret_name.",
+                  "additionalProperties": {
                     "type": "object",
-                    "required": ["name", "value"],
+                    "required": ["key_vault_name", "secret_name"],
                     "properties": {
-                      "name": {
-                        "type": "string",
-                        "description": "Name of the secret"
-                      },
-                      "value": {
-                        "type": "string",
-                        "description": "Value of the secret"
-                      }
+                      "key_vault_name": { "type": "string", "description": "Azure Key Vault name" },
+                      "secret_name": { "type": "string", "description": "Secret name in Key Vault" }
                     }
                   }
+                },
+                "container_environment": {
+                  "type": "string",
+                  "description": "Maps to Container App Environment key in remote state",
+                  "default": "default"
                 }
               },
               "allOf": [

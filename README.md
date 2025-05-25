@@ -1,9 +1,13 @@
 # GitHub Environment Vending for Azure Container Apps
 
+> **🚧 WORK IN PROGRESS** 🚧  
+> This project is currently under active development. Features, APIs, and documentation may change without notice. Use at your own risk in production environments.
+
 [![Terraform Validation](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/pr-validation.yml)
 [![Dependabot Auto-Merge](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/dependabot-auto-merge.yml/badge.svg)](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/dependabot-auto-merge.yml)
 [![Community Friendly](https://img.shields.io/badge/Community-Friendly-brightgreen?style=flat&logo=github)](./CONTRIBUTING.md)
 [![Good First Issues](https://img.shields.io/github/issues/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/good%20first%20issue?color=7057ff&logo=github)](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+[![Work in Progress](https://img.shields.io/badge/Status-Work%20in%20Progress-yellow?style=flat&logo=github)](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending)
 
 ## 🌟 **Welcome Contributors!**
 
@@ -52,10 +56,13 @@
   - [Common Troubleshooting](#common-troubleshooting)
   - [Recommended Workflow Configurations](#recommended-workflow-configurations)
 - [GitHub Actions Workflow Example](#github-actions-workflow-example)
+- [Dependency Management](#dependency-management)
 - [🧪 **Testing**](#testing)
   - [🚀 Quick Local Validation](#quick-local-validation)
   - [🔗 Integration Testing](#integration-testing)
   - [📋 Test Coverage](#test-coverage)
+- [📚 Documentation](#documentation)
+- [Troubleshooting: Key Vault Integration](#troubleshooting-key-vault-integration)
 
 ## Quick Setup Guide
 
@@ -73,7 +80,7 @@ You need just two files in your IaC repository:
    mkdir -p .github/workflows
    
    # Download the workflow file
-   curl -o .github/workflows/vend-aca-github-environments.yml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/.github/workflows/vend-aca-github-environments.yml
+   curl -o .github/workflows/github-environment-aca.yml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/.github/workflows/github-environment-aca.yml
    ```
 
 2. Create an environment configuration file in your repository - use the minimal configuragion
@@ -130,7 +137,7 @@ Follow your team's standard workflow to get your changes into the main branch:
 
 2. Commit your changes
    ```bash
-   git add .github/workflows/vend-aca-github-environments.yml deployments/github/github-environments.yaml
+   git add .github/workflows/github-environment-aca.yml deployments/github/github-environments.yaml
    git commit -m "Add GitHub environments configuration for ACA"
    ```
 
@@ -145,34 +152,29 @@ Follow your team's standard workflow to get your changes into the main branch:
 
 Once your changes are merged to the main branch, run the workflow using GitHub CLI:
 
-1. **Setup GitHub CLI Authentication** (recommended):
+1. **Setup GitHub CLI Authentication** (one-time setup):
    ```bash
-   # Install GitHub CLI if not already installed
-   # macOS: brew install gh
-   # Windows: winget install GitHub.cli
-   # Linux: See https://github.com/cli/cli#installation
-   
-   # Authenticate with GitHub (one-time setup)
+   # Install and authenticate with GitHub CLI
    gh auth login
    
    # Verify authentication
    gh auth status
    ```
 
-   > **💡 Why GitHub CLI?** GitHub CLI tokens never expire, have automatic scope management, and provide better security than Personal Access Tokens. See our [Authentication Guide](./AUTHENTICATION.md) for detailed setup instructions.
+   > **💡 Why GitHub CLI?** GitHub CLI provides secure OAuth-based authentication with automatic scope management. See our [Authentication Guide](./AUTHENTICATION.md) for detailed setup instructions, security comparison, and alternative methods.
 
 2. Run the workflow with your token:
 
    **Standard Stratus IaC Repository Pattern** (recommended):
    ```bash
-   gh workflow run vend-aca-github-environments.yml \
+   gh workflow run github-environment-aca.yml \
      -f github_token=$(gh auth token) \
      -f tfvars_file=<environment>.tfvars
    ```
 
    **Custom Setup with Remote State Overrides** (advanced):
    ```bash
-   gh workflow run vend-aca-github-environments.yml \
+   gh workflow run github-environment-aca.yml \
      -f github_token=$(gh auth token) \
      -f tfvars_file=<environment>.tfvars \
      -f remote_state_config="rg=custom-state-rg,sa=customstateaccount,container=tfstate,key=custom-environment.tfstate"
@@ -243,19 +245,19 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
 > **Practical Example - Multiple Environments**:
 > ```bash
 > # Deploy ace1 environments to dev Stratus Landing Zone
-> gh workflow run vend-aca-github-environments.yml \
+> gh workflow run github-environment-aca.yml \
 >   -f github_token=$(gh auth token) \
 >   -f tfvars_file=dev.tfvars \
 >   -f github_env_file=github-environments-dev-ace1.yaml
 > 
 > # Deploy ace2 environments to dev Stratus Landing Zone  
-> gh workflow run vend-aca-github-environments.yml \
+> gh workflow run github-environment-aca.yml \
 >   -f github_token=$(gh auth token) \
 >   -f tfvars_file=dev.tfvars \
 >   -f github_env_file=github-environments-dev-ace2.yaml
 > 
 > # Deploy ace1 environments to prod Stratus Landing Zone
-> gh workflow run vend-aca-github-environments.yml \
+> gh workflow run github-environment-aca.yml \
 >   -f github_token=$(gh auth token) \
 >   -f tfvars_file=prod.tfvars \
 >   -f github_env_file=github-environments-prod-ace1.yaml
@@ -264,19 +266,19 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
 > **Using Specific Repository Versions**:
 > ```bash
 > # Deploy from a specific IaC repository branch (e.g., feature branch for testing)
-> gh workflow run vend-aca-github-environments.yml \
+> gh workflow run github-environment-aca.yml \
 >   -f github_token=$(gh auth token) \
 >   -f tfvars_file=dev.tfvars \
 >   -f iac_repo_ref=feature/new-environments
 > 
 > # Deploy using a specific module version (for testing new module features)
-> gh workflow run vend-aca-github-environments.yml \
+> gh workflow run github-environment-aca.yml \
 >   -f github_token=$(gh auth token) \
 >   -f tfvars_file=dev.tfvars \
 >   -f module_repo_ref=feature/new-feature
 > 
 > # Deploy from specific release tags for both IaC and module
-> gh workflow run vend-aca-github-environments.yml \
+> gh workflow run github-environment-aca.yml \
 >   -f github_token=$(gh auth token) \
 >   -f tfvars_file=prod.tfvars \
 >   -f iac_repo_ref=v1.2.3 \
@@ -286,19 +288,19 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
 > **Using Remote State Configuration**:
 > ```bash
 > # Override just the state file key
-> gh workflow run vend-aca-github-environments.yml \
+> gh workflow run github-environment-aca.yml \
 >   -f github_token=$(gh auth token) \
 >   -f tfvars_file=dev.tfvars \
 >   -f remote_state_config="key=container_app.tfstate"
 > 
 > # Override resource group and key
-> gh workflow run vend-aca-github-environments.yml \
+> gh workflow run github-environment-aca.yml \
 >   -f github_token=$(gh auth token) \
 >   -f tfvars_file=dev.tfvars \
 >   -f remote_state_config="rg=custom-state-rg,key=custom.tfstate"
 > 
 > # Complete custom remote state configuration
-> gh workflow run vend-aca-github-environments.yml \
+> gh workflow run github-environment-aca.yml \
 >   -f github_token=$(gh auth token) \
 >   -f tfvars_file=dev.tfvars \
 >   -f remote_state_config="rg=custom-rg,sa=customsa,container=tfstate,key=custom.tfstate"
@@ -326,7 +328,7 @@ For teams with multiple Stratus environments and Container App Environments, we 
 ```
 your-iac-repo/
 ├── .github/workflows/
-│   └── vend-aca-github-environments.yml
+│   └── github-environment-aca.yml
 ├── deployments/
 │   ├── *.tf                                 # Terraform infrastructure files
 │   ├── tfvars/                              # Environment-specific tfvars
@@ -375,12 +377,12 @@ This module is specifically focused on setting up the connection between GitHub 
 
 ## Prerequisites
 
-- **GitHub CLI** (recommended for authentication) - [Installation Guide](https://github.com/cli/cli#installation)
+- **GitHub CLI** (recommended for authentication) - See [Authentication Guide](./AUTHENTICATION.md)
 - GitHub repository with proper permissions
 - Azure subscription with contributor rights
 - Terraform >= 1.3.0
 
-> **Authentication**: We strongly recommend using GitHub CLI authentication (`gh auth login`) instead of Personal Access Tokens. GitHub CLI tokens never expire and provide better security. See our [Authentication Guide](./AUTHENTICATION.md) for detailed setup instructions.
+> **Authentication**: We strongly recommend using GitHub CLI authentication. See our [Authentication Guide](./AUTHENTICATION.md) for setup instructions, security comparison, and alternative methods.
 
 ## Understanding Environment Types in Stratus
 
@@ -469,7 +471,7 @@ For example, your organization might use a single Azure subscription with one Co
 flowchart TB
     %% IaC Repository Workflow
     subgraph IaCRepo["🏗️ IaC Repository"]
-        Workflow["vend-aca-github-environments.yml<br/>Creates GitHub environments"]
+        Workflow["github-environment-aca.yml<br/>Creates GitHub environments"]
     end
     
     %% Stratus Landing Zones (Azure Infrastructure)
@@ -535,7 +537,7 @@ flowchart TB
 
 **🏗️ IaC Repository (Orange Box)**:
 - Contains the GitHub environment vending workflow
-- Runs `vend-aca-github-environments.yml` to create environments in application repositories
+- Runs `github-environment-aca.yml` to create environments in application repositories
 - Manages centralized configuration and permissions
 
 **☁️ Stratus Landing Zones (Blue Boxes)**:
@@ -609,7 +611,7 @@ graph LR
    Application developers can now use the configured environments to deploy to Azure Container Apps without managing credentials, using secure OIDC federation.
 
 > **Simplified File Requirements:** You only need two files in your IaC repo:
-> 1. The workflow file (`.github/workflows/vend-aca-github-environments.yml`)
+> 1. The workflow file (`.github/workflows/github-environment-aca.yml`)
 > 2. The GitHub environments configuration YAML file
 
 > **No Terraform Files Needed:** The workflow checks out the module code directly from this repository. You don't need to create any Terraform files in your IaC repo.
@@ -869,8 +871,24 @@ output "github_environment_config" {
           # ... other dev-specific variables
         }
         secrets = {
-          DATABASE_CONNECTION_STRING = "Server=dev-db..."
-          API_KEY                   = "dev-api-key"
+          DATABASE_CONNECTION_STRING = {
+            key_vault_name = azurerm_key_vault.dev.name
+            secret_name    = "database-connection-string"
+          }
+          API_KEY = {
+            key_vault_name = azurerm_key_vault.dev.name
+            secret_name    = "api-key"
+          }
+          THIRD_PARTY_API_KEY = {
+            key_vault_name = "shared-secrets-kv"
+            secret_name    = "third-party-api-key"
+          }
+        }
+        # Key Vault configuration for secret access
+        key_vault = {
+          # Primary Key Vault for this environment
+          name                = azurerm_key_vault.dev.name
+          resource_group_name = azurerm_key_vault.dev.resource_group_name
         }
         settings = {
           # Optional: Default GitHub environment settings for this Azure environment
@@ -891,6 +909,11 @@ output "github_environment_config" {
             {
               scope = azurerm_container_app_environment.dev.id
               role  = "Reader"
+            },
+            # Add Key Vault access for the managed identity
+            {
+              scope = azurerm_key_vault.dev.id
+              role  = "Key Vault Secrets User"
             }
           ]
           plan = [
@@ -925,8 +948,23 @@ output "github_environment_config" {
           # ... other prod-specific variables
         }
         secrets = {
-          DATABASE_CONNECTION_STRING = "Server=prod-db..."
-          API_KEY                   = "prod-api-key"
+          DATABASE_CONNECTION_STRING = {
+            key_vault_name = azurerm_key_vault.prod.name
+            secret_name    = "database-connection-string"
+          }
+          API_KEY = {
+            key_vault_name = azurerm_key_vault.prod.name
+            secret_name    = "api-key"
+          }
+          SHARED_SERVICE_KEY = {
+            key_vault_name = "shared-prod-secrets-kv"
+            secret_name    = "shared-service-key"
+          }
+        }
+        # Key Vault configuration for secret access
+        key_vault = {
+          name                = azurerm_key_vault.prod.name
+          resource_group_name = azurerm_key_vault.prod.resource_group_name
         }
         settings = {
           # Stricter settings for production
@@ -946,6 +984,11 @@ output "github_environment_config" {
             {
               scope = azurerm_container_app_environment.prod.id
               role  = "Reader"
+            },
+            # Add Key Vault access for the managed identity
+            {
+              scope = azurerm_key_vault.prod.id
+              role  = "Key Vault Secrets User"
             }
           ]
           plan = [
@@ -1000,11 +1043,9 @@ secrets:
 
 **Variable Precedence**: Remote State → Per-Environment → YAML (highest precedence)
 
-**Secret Sources**: Secrets can come from both remote state (`github_environment_config.secrets`) and YAML configuration. Both sources are combined, with YAML secrets taking precedence if there are naming conflicts.
+**Secret Sources**: All secrets must be defined as Key Vault references in remote state (`github_environment_config.secrets`).
 
-> **Important**: Container App deployments using Azure OIDC federation typically don't need GitHub Environment secrets for Azure authentication since all Azure variables are automatically provided. Use secrets for build steps or third-party services only.
-
-> **Security Note**: For production environments, consider using Azure Key Vault references in your remote state output instead of hardcoding sensitive values.
+> **Important**: Every secret must be a map with `key_vault_name` and `secret_name`. The module will fetch the value from Azure Key Vault at apply time and securely transfer it to GitHub Environment secrets. Direct secret values are not supported.
 
 ## Azure Resources Created
 
@@ -1291,86 +1332,23 @@ These issues appear to be related to GitHub's API implementation, not with the m
 | `iac_repo_url` | Optional URL of IaC repository for tracking (must start with https://) | `string` | `null` | no |
 | `remote_state_resource_group_name` | Optional override for remote state resource group name | `string` | `null` | no |
 | `remote_state_storage_account_name` | Optional override for remote state storage account name | `string` | `null` | no |
-| `remote_state_container` | Optional override for remote state container name | `string` | `null` | no |
-| `remote_state_key` | Optional override for remote state key (must end with .tfstate) | `string` | `null` | no |
+| `remote_state_container` | Optional override for remote state container name | `
 
-### Enhanced Features
+## Troubleshooting: Key Vault Integration
 
-#### **Comprehensive Input Validation**
-All variables now include validation rules that catch errors early:
-- **Azure naming constraints**: Enforces Azure resource naming requirements
-- **GitHub format validation**: Ensures valid GitHub usernames and file formats
-- **Reserved prefix protection**: Prevents conflicts with Azure reserved names
-- **Length constraints**: Validates character limits for all inputs
+**1. Secret Not Found**
+- Ensure the secret exists in the specified Key Vault and is not disabled or expired.
+- Double-check the spelling of `key_vault_name` and `secret_name`.
 
-#### **Consistent Resource Naming**
-The module uses a standardized naming convention:
-- **Pattern**: `{code_name}-{resource_type}-{environment}-{purpose}-{suffix}`
-- **Example**: `myapp-rg-dev-github-identities-a1b2`
-- **Customizable suffix**: Use `resource_group_suffix` for predictable naming
+**2. Permission Denied**
+- The managed identity running this module must have the `Key Vault Secrets User` role on the Key Vault.
+- You can assign this role in the `role_assignments` section of your remote state output.
 
-#### **Comprehensive Resource Tagging**
-All Azure resources are tagged with:
-- **Core identification**: Environment, CodeName, Purpose, ManagedBy
-- **Repository tracking**: ModuleRepository, ModuleVersion, IaCRepository
-- **Deployment metadata**: DeploymentDate, TerraformWorkspace
-- **GitHub integration**: GitHubOrganization, TotalEnvironments, TotalRepositories
-- **Azure integration**: AzureSubscription, AzureTenant, AzureRegion
-- **Resource-specific tags**: ResourceType, GitHubRepository, GitHubEnvironment
+**3. Key Vault Not Found**
+- Make sure the Key Vault name and resource group are correct in your remote state output.
+- The module attempts to look up the Key Vault by name and resource group.
 
-#### **Data Source Optimization**
-The module optimizes GitHub API calls by:
-- **Pre-computing unique users/teams**: Only looks up referenced reviewers
-- **Eliminating duplicates**: Uses `toset()` to prevent duplicate API calls
-- **Performance improvement**: Reduces plan time and API rate limiting
+**4. Secret Value Not Updated**
+- If you update a secret in Key Vault, you may need to re-apply the module to update the GitHub Environment Secret.
 
-## Dependency Management
-
-This module uses [Dependabot](.github/DEPENDABOT.md) for automatic dependency updates:
-
-### 🤖 **Automated Updates**
-- **Terraform Providers**: Weekly updates every Monday
-- **GitHub Actions**: Weekly updates with validation
-- **Security Updates**: Automatic priority updates
-
-### 🔄 **Auto-Merge Process**
-- **Safe Updates**: Patch and security updates are automatically merged
-- **Validation Required**: All updates must pass Terraform validation
-- **Manual Review**: Major version updates require team approval
-
-### 📋 **Update Grouping**
-- **Azure Providers**: `azurerm`, `azapi` grouped together
-- **GitHub Providers**: `github` provider updates
-- **Utility Providers**: `random`, `null`, `time` grouped together
-
-For detailed configuration and troubleshooting, see [Dependabot Documentation](.github/DEPENDABOT.md).
-
-## 🧪 **Testing**
-
-This module includes comprehensive testing infrastructure:
-
-### **🚀 Quick Local Validation**
-```bash
-# Run local validation (no deployment)
-./scripts/test-local.sh
-```
-
-### **🔗 Integration Testing**
-Real integration tests run automatically via **GitHub Actions** on:
-- Pull requests to `main` branch
-- Pushes to `main` branch
-- Manual workflow dispatch
-
-**Why GitHub Actions?** The module cannot be tested as a child module because:
-- ✅ Provider configurations are defined directly in the module
-- ✅ Import blocks are used (only allowed in root modules)
-- ✅ Backend configuration exists in the module
-
-### **📋 Test Coverage**
-- **Configuration validation**: YAML structure and business rules
-- **Azure resources**: Managed identities and role assignments
-- **GitHub integration**: Environments, variables, secrets, policies
-- **Security validation**: Production controls and reviewer requirements
-- **API validation**: GitHub API confirms resource creation
-
-For detailed testing information, see [`tests/README.md`](tests/README.md).
+---
