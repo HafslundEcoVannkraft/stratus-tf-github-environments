@@ -1,0 +1,118 @@
+name: 🌟 Good First Issue
+description: Create a beginner-friendly issue for new contributors
+title: "[Good First Issue] "
+labels: ["good first issue", "help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🌟 Creating a Good First Issue
+        
+        This template helps maintainers create beginner-friendly issues that welcome new contributors to the project.
+
+  - type: input
+    id: task-summary
+    attributes:
+      label: Task Summary
+      description: Brief description of what needs to be done
+      placeholder: "e.g., Fix typo in README.md, Add example configuration, Update documentation"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: difficulty
+    attributes:
+      label: Difficulty Level
+      description: How challenging is this task for a beginner?
+      options:
+        - "🟢 Easy (30 minutes or less)"
+        - "🟡 Medium (1-2 hours)"
+        - "🟠 Moderate (half day)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: What type of contribution is this?
+      options:
+        - "📚 Documentation"
+        - "🐛 Bug Fix"
+        - "✨ Feature Enhancement"
+        - "🧪 Testing"
+        - "🔧 Configuration"
+        - "🎨 UI/UX"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Detailed Description
+      description: Explain what needs to be done and why
+      placeholder: |
+        Describe the task in detail:
+        - What exactly needs to be changed?
+        - Why is this change needed?
+        - What's the expected outcome?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Step-by-Step Guide
+      description: Break down the task into simple steps
+      placeholder: |
+        1. Fork the repository
+        2. Navigate to file X
+        3. Change Y to Z
+        4. Test the change by...
+        5. Submit a pull request
+    validations:
+      required: true
+
+  - type: textarea
+    id: resources
+    attributes:
+      label: Helpful Resources
+      description: Links or references that might help
+      placeholder: |
+        - Link to relevant documentation
+        - Similar examples in the codebase
+        - External resources or tutorials
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: How will we know this is complete?
+      placeholder: |
+        - [ ] Specific requirement 1
+        - [ ] Specific requirement 2
+        - [ ] Tests pass
+        - [ ] Documentation updated
+
+  - type: checkboxes
+    id: mentor-available
+    attributes:
+      label: Mentorship
+      description: Support available for this issue
+      options:
+        - label: "🤝 Maintainer available for guidance"
+        - label: "💬 Community support in discussions"
+        - label: "📚 Self-contained with good documentation"
+
+  - type: markdown
+    attributes:
+      value: |
+        ## 🎯 For New Contributors
+        
+        **Welcome!** This issue is specifically designed for people new to open source or this project.
+        
+        - 🤔 **Questions?** Don't hesitate to ask in the comments
+        - 📚 **Need help?** Check our [Contributing Guide](./CONTRIBUTING.md)
+        - 🎉 **First time?** We're excited to help you make your first contribution!
+        
+        **Ready to start?** Comment below to let us know you're working on this! 

@@ -1,0 +1,10 @@
+repositories:
+  - repo: "test-integration-repo"
+    environments:
+      - name: "integration-test"
+        container_environment: "dev"
+        wait_timer: 0
+        prevent_self_review: false
+        variables:
+          TEST_INTEGRATION: "true"
+          TEST_ENVIRONMENT: "integration" 

@@ -94,8 +94,8 @@ Workflow that handles:
 - **NPM**: Max 2 open PRs
 
 ### Team Assignment
-- **Reviewers**: `HafslundEcoVannkraft/platform-team`
-- **Assignees**: `HafslundEcoVannkraft/platform-team`
+- **Reviewers**: `HafslundEcoVannkraft/stratus-az-platform-approvers`
+- **Assignees**: `HafslundEcoVannkraft/stratus-az-platform-approvers`
 
 ## 🚨 Troubleshooting
 

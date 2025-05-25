@@ -2,6 +2,27 @@
 
 [![Terraform Validation](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/pr-validation.yml)
 [![Dependabot Auto-Merge](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/dependabot-auto-merge.yml/badge.svg)](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/actions/workflows/dependabot-auto-merge.yml)
+[![Community Friendly](https://img.shields.io/badge/Community-Friendly-brightgreen?style=flat&logo=github)](./CONTRIBUTING.md)
+[![Good First Issues](https://img.shields.io/github/issues/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/good%20first%20issue?color=7057ff&logo=github)](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+
+## 🌟 **Welcome Contributors!**
+
+**We love community contributions!** 🎉 This project is designed to be **contributor-friendly** with:
+
+- 🚀 **Simple setup** - Get started in minutes
+- 🤖 **Helpful automation** - Our bots guide you through the process
+- 📚 **Clear documentation** - Everything you need to know
+- 🤝 **Welcoming community** - We're here to help you succeed
+
+### 🎯 **Quick Ways to Contribute**
+- 🐛 **Found a bug?** [Open an issue](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues/new?template=bug-report.yml)
+- 📚 **Improve docs** - Fix typos, add examples, clarify instructions
+- ✨ **Add features** - Check our [good first issues](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+- 🧪 **Test examples** - Try our configurations and share feedback
+
+**New to open source?** Perfect! Check our [Contributing Guide](./CONTRIBUTING.md) for a gentle introduction.
+
+---
 
 > **Note:** This module is specifically tailored for developer teams building on the Stratus Corp Azure Landing Zone with Container App Environment. It is optimized for the IaC Repositories created for each new system or team starting their journey in Stratus. Some input variables and design choices are opinionated for this workflow. **This module may not be the optimal choice for other use cases or non-Stratus environments.**
 
@@ -31,6 +52,10 @@
   - [Common Troubleshooting](#common-troubleshooting)
   - [Recommended Workflow Configurations](#recommended-workflow-configurations)
 - [GitHub Actions Workflow Example](#github-actions-workflow-example)
+- [🧪 **Testing**](#testing)
+  - [🚀 Quick Local Validation](#quick-local-validation)
+  - [🔗 Integration Testing](#integration-testing)
+  - [📋 Test Coverage](#test-coverage)
 
 ## Quick Setup Guide
 
@@ -57,7 +82,7 @@ You need just two files in your IaC repository:
    # Create the deployments/github directory if it doesn't exist
    mkdir -p deployments/github
    
-   curl -o deployments/github/github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/minmal.yaml
+   curl -o deployments/github/github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/main/examples/minimal.yaml
    ```
 
 3. Or use the complete configuration
@@ -120,16 +145,21 @@ Follow your team's standard workflow to get your changes into the main branch:
 
 Once your changes are merged to the main branch, run the workflow using GitHub CLI:
 
-1. First, ensure you have a GitHub token with the proper permissions:
+1. **Setup GitHub CLI Authentication** (recommended):
    ```bash
-   # Using GitHub CLI on an authorized environment with network access
-   gh auth login --web --scopes "repo,workflow,read:org,write:packages"
-   ```
-
-2. Verify you have a token with the required scopes
-   ```bash   
+   # Install GitHub CLI if not already installed
+   # macOS: brew install gh
+   # Windows: winget install GitHub.cli
+   # Linux: See https://github.com/cli/cli#installation
+   
+   # Authenticate with GitHub (one-time setup)
+   gh auth login
+   
+   # Verify authentication
    gh auth status
    ```
+
+   > **💡 Why GitHub CLI?** GitHub CLI tokens never expire, have automatic scope management, and provide better security than Personal Access Tokens. See our [Authentication Guide](./AUTHENTICATION.md) for detailed setup instructions.
 
 2. Run the workflow with your token:
 
@@ -278,7 +308,7 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
-| `github_token` | Yes | - | GitHub token with repo, workflow, and read:org permissions |
+| `github_token` | Yes | - | **GitHub CLI token (recommended)**: Use `$(gh auth token)` for secure, never-expiring authentication. See [Authentication Guide](./AUTHENTICATION.md) for setup. |
 | `tfvars_file` | Yes | - | Filename of tfvars file (searched recursively) |
 | `operation` | No | `apply` | Operation to perform (`apply` or `destroy`) |
 | `github_env_file` | No | `github-environments.yaml` | Filename of GitHub environment config |
@@ -345,10 +375,12 @@ This module is specifically focused on setting up the connection between GitHub 
 
 ## Prerequisites
 
+- **GitHub CLI** (recommended for authentication) - [Installation Guide](https://github.com/cli/cli#installation)
 - GitHub repository with proper permissions
-- GitHub token with `repo` and `workflow` permissions
 - Azure subscription with contributor rights
 - Terraform >= 1.3.0
+
+> **Authentication**: We strongly recommend using GitHub CLI authentication (`gh auth login`) instead of Personal Access Tokens. GitHub CLI tokens never expire and provide better security. See our [Authentication Guide](./AUTHENTICATION.md) for detailed setup instructions.
 
 ## Understanding Environment Types in Stratus
 
@@ -1312,3 +1344,33 @@ This module uses [Dependabot](.github/DEPENDABOT.md) for automatic dependency up
 - **Utility Providers**: `random`, `null`, `time` grouped together
 
 For detailed configuration and troubleshooting, see [Dependabot Documentation](.github/DEPENDABOT.md).
+
+## 🧪 **Testing**
+
+This module includes comprehensive testing infrastructure:
+
+### **🚀 Quick Local Validation**
+```bash
+# Run local validation (no deployment)
+./scripts/test-local.sh
+```
+
+### **🔗 Integration Testing**
+Real integration tests run automatically via **GitHub Actions** on:
+- Pull requests to `main` branch
+- Pushes to `main` branch
+- Manual workflow dispatch
+
+**Why GitHub Actions?** The module cannot be tested as a child module because:
+- ✅ Provider configurations are defined directly in the module
+- ✅ Import blocks are used (only allowed in root modules)
+- ✅ Backend configuration exists in the module
+
+### **📋 Test Coverage**
+- **Configuration validation**: YAML structure and business rules
+- **Azure resources**: Managed identities and role assignments
+- **GitHub integration**: Environments, variables, secrets, policies
+- **Security validation**: Production controls and reviewer requirements
+- **API validation**: GitHub API confirms resource creation
+
+For detailed testing information, see [`tests/README.md`](tests/README.md).

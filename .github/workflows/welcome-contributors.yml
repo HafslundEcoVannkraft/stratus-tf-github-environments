@@ -1,0 +1,171 @@
+name: Welcome Contributors
+
+on:
+  pull_request_target:
+    types: [opened]
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Welcome new contributors
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Get the author of the PR/issue
+            const author = context.payload.sender.login;
+            const isIssue = context.eventName === 'issues';
+            const isPR = context.eventName === 'pull_request_target';
+            
+            // Check if this is their first contribution
+            const { data: contributions } = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${context.repo.owner}/${context.repo.repo} author:${author}`,
+              sort: 'created',
+              order: 'asc',
+              per_page: 5
+            });
+            
+            const isFirstContribution = contributions.total_count <= 1;
+            
+            if (isFirstContribution) {
+              if (isPR) {
+                // Welcome message for first-time PR contributors
+                const welcomeMessage = [
+                  "## 🎉 Welcome to the community!",
+                  "",
+                  "Thank you for your first contribution to this project! 🚀",
+                  "",
+                  "Here's what happens next:",
+                  "- 🤖 Our automated checks will run to validate your changes",
+                  "- 👀 A maintainer will review your pull request",
+                  "- 💬 Feel free to ask questions in the comments if you need help",
+                  "",
+                  "### 📚 Helpful Resources",
+                  `- [Contributing Guide](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/CONTRIBUTING.md)`,
+                  `- [Support Documentation](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/.github/SUPPORT.md)`,
+                  "",
+                  "We appreciate your contribution and look forward to working with you! 🤝"
+                ].join('\n');
+
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: welcomeMessage
+                });
+
+                // Add first-time contributor label
+                await github.rest.issues.addLabels({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  labels: ['first-time contributor']
+                });
+              }
+              
+              if (isIssue) {
+                // Welcome message for first-time issue creators
+                const welcomeMessage = [
+                  "## 👋 Welcome!",
+                  "",
+                  "Thank you for opening your first issue! We appreciate you taking the time to contribute.",
+                  "",
+                  "### What happens next?",
+                  "- 🏷️ A maintainer will add appropriate labels to categorize your issue",
+                  "- 📋 We'll review the details and ask for clarification if needed",
+                  "- 🔄 We'll keep you updated on progress",
+                  "",
+                  "### 💡 Tips for faster resolution",
+                  "- Provide as much detail as possible",
+                  "- Include examples or screenshots if relevant",
+                  `- Check our [documentation](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/README.md) for common solutions`,
+                  "",
+                  "Thanks for helping make this project better! 🌟"
+                ].join('\n');
+
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: welcomeMessage
+                });
+
+                // Add first-time contributor label
+                await github.rest.issues.addLabels({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  labels: ['first-time contributor']
+                });
+              }
+            }
+
+  auto-label-pr:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_target'
+    steps:
+      - name: Auto-label pull requests
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            const labels = [];
+            
+            // Check file types and add appropriate labels
+            const hasDocChanges = files.some(file => 
+              file.filename.endsWith('.md') || 
+              file.filename.includes('README') ||
+              file.filename.includes('CONTRIBUTING')
+            );
+            
+            const hasWorkflowChanges = files.some(file => 
+              file.filename.includes('.github/workflows/')
+            );
+            
+            const hasTerraformChanges = files.some(file => 
+              file.filename.endsWith('.tf') || 
+              file.filename.endsWith('.tfvars')
+            );
+            
+            const hasExampleChanges = files.some(file => 
+              file.filename.includes('examples/') ||
+              file.filename.endsWith('.yaml') ||
+              file.filename.endsWith('.yml')
+            );
+
+            // Add labels based on changes
+            if (hasDocChanges) labels.push('documentation');
+            if (hasWorkflowChanges) labels.push('github-actions');
+            if (hasTerraformChanges) labels.push('terraform');
+            if (hasExampleChanges) labels.push('examples');
+            
+            // Determine size label
+            const totalChanges = files.reduce((sum, file) => sum + file.changes, 0);
+            if (totalChanges <= 10) {
+              labels.push('size/small');
+            } else if (totalChanges <= 50) {
+              labels.push('size/medium');
+            } else {
+              labels.push('size/large');
+            }
+
+            // Add labels if any were determined
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: labels
+              });
+            } 

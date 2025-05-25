@@ -251,6 +251,7 @@ output "raw_configuration" {
 
 output "validation_status" {
   description = "Comprehensive validation status and any issues found during configuration processing."
+  sensitive   = true
   value = {
     overall_status = local.validation_passed ? "PASSED" : "FAILED"
     can_deploy     = local.can_deploy
