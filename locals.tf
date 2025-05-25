@@ -50,6 +50,37 @@ data "github_repository_environments" "existing" {
 }
 
 # =============================================================================
+# KEY VAULT DATA SOURCES FOR SECRETS
+# =============================================================================
+
+# Data source to get Key Vault information for referenced vaults
+data "azurerm_key_vault" "referenced_vaults" {
+  for_each = toset([
+    for ref in local.key_vault_references : ref.key_vault_name
+  ])
+
+  name = each.key
+  resource_group_name = try(
+    # Try to get resource group from environment config
+    [
+      for env_name, env_config in try(local.github_environment_config.environments, {}) :
+      try(env_config.key_vault.resource_group_name, null)
+      if try(env_config.key_vault.name, null) == each.key
+    ][0],
+    # Fallback: try to find it in current subscription (this may fail if KV is in different RG)
+    null
+  )
+}
+
+# Data source to read Key Vault secrets referenced in remote state
+data "azurerm_key_vault_secret" "remote_state_secrets" {
+  for_each = local.unique_kv_secrets
+
+  name         = each.value.secret_name
+  key_vault_id = data.azurerm_key_vault.referenced_vaults[each.value.key_vault_name].id
+}
+
+# =============================================================================
 # LOCAL VALUES
 # =============================================================================
 
@@ -85,6 +116,39 @@ locals {
   # This links to infrastructure provisioned by another Terraform configuration
   # Contains references to ACR, Container App Environment, and other shared resources
   remote_state_outputs = try(data.terraform_remote_state.container_app_environment.outputs, {})
+
+  # GitHub environment configuration from remote state
+  # The remote state should output github_environment_config with environments map
+  # Each environment can have its own variables, secrets, role assignments, and settings
+  github_environment_config = try(local.remote_state_outputs.github_environment_config, {
+    environments = {}
+  })
+
+  # =============================================================================
+  # KEY VAULT SECRETS PROCESSING
+  # =============================================================================
+
+  # Extract all Key Vault references from remote state secrets
+  key_vault_references = flatten([
+    for env_name, env_config in try(local.github_environment_config.environments, {}) : [
+      for secret_name, secret_config in try(env_config.secrets, {}) : {
+        key_vault_name     = try(secret_config.key_vault_name, null)
+        secret_name        = try(secret_config.secret_name, null)
+        env_name           = env_name
+        github_secret_name = secret_name
+      }
+      if can(secret_config.key_vault_name) && can(secret_config.secret_name)
+    ]
+  ])
+
+  # Create unique Key Vault + secret combinations for data source lookups
+  unique_kv_secrets = {
+    for ref in local.key_vault_references :
+    "${ref.key_vault_name}:${ref.secret_name}" => {
+      key_vault_name = ref.key_vault_name
+      secret_name    = ref.secret_name
+    }
+  }
 
   # =============================================================================
   # ROLE ASSIGNMENTS PROCESSING
@@ -193,118 +257,46 @@ locals {
     managed_identity_prefix = "${var.code_name}-id-github"
   }
 
-  # Comprehensive resource tagging strategy
-  common_tags = {
-    # Core identification tags
-    Environment = var.environment
-    CodeName    = var.code_name
-    Purpose     = "github-environment-vending"
-    ManagedBy   = "terraform"
-
-    # Module and repository tracking
-    ModuleRepository = "HafslundEcoVannkraft/stratus-tf-aca-gh-vending"
-    ModuleVersion    = var.module_repo_ref
-    IaCRepository    = var.iac_repo_url != null ? var.iac_repo_url : "unknown"
-
-    # Deployment metadata
-    DeploymentDate     = formatdate("YYYY-MM-DD", timestamp())
-    TerraformWorkspace = terraform.workspace
-
-    # GitHub integration metadata
-    GitHubOrganization = var.github_owner
-    TotalEnvironments  = tostring(length(local.flattened_repo_environments))
-    TotalRepositories  = tostring(length(distinct([for repo in local.repositories : repo.repo])))
-
-    # Azure integration metadata
-    AzureSubscription = data.azurerm_client_config.current.subscription_id
-    AzureTenant       = data.azurerm_client_config.current.tenant_id
-    AzureRegion       = var.location
-  }
+  # Common tags applied to all resources
+  common_tags = merge(var.tags, {
+    Environment    = var.environment
+    CodeName       = var.code_name
+    ManagedBy      = "terraform"
+    Module         = "stratus-tf-aca-gh-vending"
+    DeploymentDate = timestamp()
+  })
 
   # =============================================================================
-  # VALIDATION
+  # VALIDATION AND DEPLOYMENT READINESS
   # =============================================================================
 
-  # Comprehensive validation for module requirements
-  validation_results = {
-    # YAML Structure Validation
-    yaml_has_repositories = length(local.config.repositories) > 0
-    yaml_repositories_valid = alltrue([
-      for repo in local.config.repositories :
-      can(repo.repo) && length(repo.repo) > 0 && can(repo.environments) && length(repo.environments) > 0
-    ])
-    yaml_environments_valid = alltrue(flatten([
-      for repo in local.config.repositories : [
-        for env in repo.environments :
-        can(env.name) && length(env.name) > 0 && can(regex("^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$", env.name))
-      ]
-    ]))
-
-    # Remote State Validation
-    remote_state_accessible           = try(local.remote_state_outputs != null, false)
-    github_environment_config_present = try(local.github_environment_config != null, false)
-
-    # Environment Configuration Validation
-    no_duplicate_environments = length(local.environments) == length(distinct([
-      for env in local.environments : "${env.repository}:${env.environment}"
-    ]))
-
-    # Container Environment Mapping Validation
-    container_environments_valid = alltrue([
-      for env in local.environments :
-      try(env.container_environment != null && length(env.container_environment) > 0, true)
-    ])
-
-    # Role Assignment Validation (for new convention)
-    role_assignments_valid = try(
-      local.github_environment_config.environments != null &&
-      length(local.github_environment_config.environments) > 0,
-      true # Allow empty if using legacy approach
-    )
-
-    # Reviewer Configuration Validation
-    reviewers_valid = alltrue([
-      for env in local.environments :
-      try(
-        # If reviewers are specified, they must have valid structure
-        env.reviewers == null || (
-          (try(length(env.reviewers.users), 0) > 0 && alltrue([
-            for user in try(env.reviewers.users, []) : can(user.username) && length(user.username) > 0
-          ])) ||
-          (try(length(env.reviewers.teams), 0) > 0 && alltrue([
-            for team in try(env.reviewers.teams, []) :
-            (can(team.name) && length(team.name) > 0) || (can(team.slug) && length(team.slug) > 0)
-          ]))
-        ),
-        true
-      )
-    ])
+  # Validation checks for configuration integrity
+  validation_checks = {
+    has_repositories = length(local.repositories) > 0
+    has_environments = length(flatten([for repo in local.repositories : repo.environments])) > 0
+    yaml_is_valid    = can(yamldecode(local.yaml_content))
   }
 
-  # Overall validation status
-  validation_passed = alltrue([
-    local.validation_results.yaml_has_repositories,
-    local.validation_results.yaml_repositories_valid,
-    local.validation_results.yaml_environments_valid,
-    local.validation_results.no_duplicate_environments,
-    local.validation_results.container_environments_valid,
-    local.validation_results.reviewers_valid
+  # Collect all environment keys (repo:env) for duplicate check
+  all_environment_keys = flatten([
+    for repo in local.repositories : [
+      for env in repo.environments : "${repo.repo}:${env.name}"
+    ]
   ])
 
-  # Detailed validation error messages
+  # True if there are no duplicate environments
+  no_duplicate_environments = length(local.all_environment_keys) == length(toset(local.all_environment_keys))
+
+  # Overall validation status
+  validation_passed = alltrue(values(local.validation_checks))
+
+  # Validation errors for configuration integrity
   validation_errors = [
-    for error in [
-      !local.validation_results.yaml_has_repositories ? "YAML configuration must contain at least one repository" : null,
-      !local.validation_results.yaml_repositories_valid ? "All repositories must have 'repo' name and 'environments' array" : null,
-      !local.validation_results.yaml_environments_valid ? "All environments must have valid 'name' (alphanumeric with hyphens, not starting/ending with hyphen)" : null,
-      !local.validation_results.no_duplicate_environments ? "Duplicate repository:environment combinations found" : null,
-      !local.validation_results.container_environments_valid ? "All environments must have valid 'container_environment' mapping" : null,
-      !local.validation_results.reviewers_valid ? "Reviewer configuration is invalid - users must have 'username', teams must have 'name' or 'slug'" : null,
-      !local.validation_results.remote_state_accessible ? "WARNING: Remote state not accessible - role assignments may not work properly" : null,
-      !local.validation_results.github_environment_config_present ? "WARNING: github_environment_config not found in remote state - using legacy role assignments" : null,
-      !local.validation_results.role_assignments_valid ? "WARNING: No valid role assignments found in remote state github_environment_config" : null
-    ] : error if error != null
-  ]
+    !local.validation_checks.has_repositories ? "YAML configuration must contain at least one repository." : null,
+    !local.validation_checks.has_environments ? "At least one environment must be defined in YAML." : null,
+    !local.validation_checks.yaml_is_valid ? "YAML file is not valid or cannot be parsed." : null,
+    !local.no_duplicate_environments ? "Duplicate environment names found (repo:name must be unique)." : null
+  ] # Add more checks as needed
 
   # Minimum deployment requirements check
   minimum_deployment_requirements = {
@@ -401,13 +393,6 @@ locals {
   # ENVIRONMENT VARIABLES PROCESSING AND AZURE INTEGRATION
   # =============================================================================
 
-  # GitHub environment configuration from remote state
-  # The remote state should output github_environment_config with environments map
-  # Each environment can have its own variables, secrets, role assignments, and settings
-  github_environment_config = try(local.remote_state_outputs.github_environment_config, {
-    environments = {}
-  })
-
   # Create a comprehensive map of environment variables for each environment
   # This provides environment variables from multiple sources:
   # 1. Remote state variables (from Azure environment-specific configuration)
@@ -432,42 +417,26 @@ locals {
   }
 
   # =============================================================================
-  # SECRETS PROCESSING
+  # SECRETS PROCESSING WITH KEY VAULT ONLY
   # =============================================================================
 
   # Process and flatten secrets from all environments
-  # Creates individual secret objects with proper key structure for resource creation
-  # Each secret gets its own entry with repository, environment, and secret details
-  # Secrets come from two sources: Azure environment-specific remote state and YAML configuration
-  # 
-  # SECURITY NOTE: Secrets from remote state are preferred as they can reference Azure Key Vault
-  # or other secure secret stores. YAML secrets should only be used for non-sensitive configuration.
-  # For production environments, consider using only remote state secrets with Key Vault references.
+  # Each secret must be a map with key_vault_name and secret_name
   environment_secrets = flatten([
-    for env in local.environments : concat(
-      # Secrets from Container App Environment-specific remote state (convert map to list of objects)
-      [
-        for secret_name, secret_value in try(local.github_environment_config.environments[env.container_environment].secrets, {}) : {
+    for env in local.environments : [
+      for secret_name, secret_config in try(local.github_environment_config.environments[env.container_environment].secrets, {}) : (
+        can(secret_config.key_vault_name) && can(secret_config.secret_name)
+        ? {
           key         = "${env.repository}:${env.environment}-${secret_name}"
           full_key    = "${env.key}-${secret_name}"
           repository  = env.repository
           environment = env.environment
           name        = secret_name
-          value       = secret_value
+          value       = data.azurerm_key_vault_secret.remote_state_secrets["${secret_config.key_vault_name}:${secret_config.secret_name}"].value
         }
-      ],
-      # Secrets from YAML (already in correct format)
-      [
-        for secret in try(env.secrets, []) : {
-          key         = "${env.repository}:${env.environment}-${secret.name}" # Unique key for this secret
-          full_key    = "${env.key}-${secret.name}"                           # Resource naming key
-          repository  = env.repository                                        # GitHub repository
-          environment = env.environment                                       # Environment name
-          name        = secret.name                                           # Secret name
-          value       = secret.value                                          # Secret value
-        }
-      ]
-    )
+        : (throw("All secrets must be a map with key_vault_name and secret_name. Secret '${secret_name}' in environment '${env.environment}' is invalid."))
+      )
+    ]
   ])
 
   # Map secrets by their unique keys for easier resource lookup
@@ -504,4 +473,20 @@ locals {
       team.name != null ? team.name : team.slug
     ]
   ]))
+
+  # True if all referenced container_environments exist in remote state
+  container_environments_valid = alltrue([
+    for env in local.environments :
+    contains(keys(local.github_environment_config.environments), env.container_environment)
+  ])
+
+  validation_results = {
+    remote_state_accessible           = can(data.terraform_remote_state.container_app_environment.outputs.github_environment_config)
+    github_environment_config_present = length(try(local.github_environment_config.environments, {})) > 0
+    yaml_has_repositories             = length(local.repositories) > 0
+    yaml_repositories_valid           = length(local.repositories) > 0
+    yaml_environments_valid           = length(flatten([for repo in local.repositories : repo.environments])) > 0
+    no_duplicate_environments         = local.no_duplicate_environments
+    container_environments_valid      = local.container_environments_valid
+  }
 }

@@ -1,0 +1,5 @@
+subscription_id            = "e783343f-3f19-4ddd-94f1-275ae2ca9e05"
+location                   = "norwayeast"
+code_name                  = "cy004"
+environment                = "dev"
+state_storage_account_name = "cy004statestdev5e6a"

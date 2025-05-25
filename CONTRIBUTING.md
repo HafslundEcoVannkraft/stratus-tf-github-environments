@@ -1,4 +1,9 @@
-# Contributing Guide
+# 🤝 **Contributing to stratus-tf-aca-gh-vending**
+
+> **🚧 WORK IN PROGRESS** 🚧  
+> This project is currently under active development. Contribution guidelines and processes may evolve as the project matures.
+
+Welcome! We're excited that you want to contribute to the **stratus-tf-aca-gh-vending** project. This guide will help you get started with contributing effectively.
 
 Thank you for your interest in contributing! 🎉 This project welcomes contributions from everyone.
 
@@ -124,6 +129,17 @@ git commit -m "docs(readme): update configuration examples"
 ## 🙏 **Recognition**
 
 All contributors are recognized in our release notes and GitHub contributors list.
+
+## 🤖 **AI-Assisted Development**
+
+If you're using AI tools to help with contributions:
+
+- **Read the AI Context**: Check [AI_CONTEXT.md](AI_CONTEXT.md) for essential project context
+- **Understand Constraints**: Be aware of GitHub API limitations and Stratus-specific requirements
+- **Follow Patterns**: Maintain existing naming conventions and architectural patterns
+- **Test Thoroughly**: AI-generated code should be validated locally before submission
+
+The AI context file provides comprehensive background that helps AI assistants understand the project's architecture, constraints, and best practices.
 
 ---
 

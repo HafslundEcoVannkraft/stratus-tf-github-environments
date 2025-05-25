@@ -6,29 +6,21 @@ This guide helps you resolve common issues when using the `stratus-tf-aca-gh-ven
 
 ### **1. Authentication & Token Issues**
 
-> **💡 Recommended Approach**: Use GitHub CLI authentication instead of Personal Access Tokens for better security and convenience.
+> **💡 Quick Setup**: For complete authentication setup instructions, see our [Authentication Guide](./AUTHENTICATION.md).
 
 #### **GitHub CLI Authentication (Recommended)**
 
-**Setup GitHub CLI Authentication:**
+**Quick Setup Check:**
 ```bash
-# Install GitHub CLI if not already installed
-# macOS: brew install gh
-# Windows: winget install GitHub.cli
-# Linux: See https://github.com/cli/cli#installation
-
-# Authenticate with GitHub
-gh auth login
-
-# Verify authentication
+# Check if GitHub CLI is installed and authenticated
 gh auth status
 
-# Get your token (for use in workflows)
-gh auth token
+# If not authenticated, see Authentication Guide for setup
+# gh auth login
 ```
 
 **Benefits of GitHub CLI tokens:**
-- ✅ **Never expire** (long-lived OAuth tokens)
+- ✅ **Long-lived OAuth tokens** (manual refresh available)
 - ✅ **Automatic scope management** (no manual scope configuration)
 - ✅ **Secure storage** (handled by GitHub CLI)
 - ✅ **Easy rotation** (just run `gh auth refresh`)
@@ -79,7 +71,7 @@ Error: Bad credentials
 ```
 
 **Solutions:**
-- **Switch to GitHub CLI**: GitHub CLI tokens never expire
+- **Switch to GitHub CLI**: GitHub CLI tokens are long-lived and manually refreshable
 - If using PATs, regenerate the expired token in GitHub settings
 - Set longer expiration periods (up to 1 year) or no expiration for PATs
 - Consider using fine-grained personal access tokens for better security
@@ -227,7 +219,7 @@ terraform refresh
 
 ### **Authentication Verification**
 ```bash
-# Verify GitHub CLI authentication
+# Quick authentication check
 gh auth status
 
 # Test GitHub API access
@@ -236,8 +228,7 @@ gh api user
 # Get current token (for debugging)
 gh auth token
 
-# Check token scopes (if using PAT)
-curl -H "Authorization: token YOUR_TOKEN" https://api.github.com/user
+# For detailed setup and troubleshooting, see: ./AUTHENTICATION.md
 ```
 
 ### **GitHub API Rate Limiting** *(Rare)*

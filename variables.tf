@@ -186,3 +186,23 @@ variable "iac_repo_url" {
     error_message = "IaC repository URL must start with https:// if provided."
   }
 }
+
+variable "tags" {
+  description = "Optional: Additional tags to apply to all resources created by this module."
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition     = length(var.tags) <= 50
+    error_message = "Maximum of 50 tags allowed per resource."
+  }
+
+  validation {
+    condition = alltrue([
+      for key, value in var.tags :
+      length(key) <= 512 && length(value) <= 256 &&
+      !can(regex("^(microsoft|azure|windows)", lower(key)))
+    ])
+    error_message = "Tag keys must be ≤512 chars, values ≤256 chars, and keys cannot start with microsoft/azure/windows."
+  }
+}
