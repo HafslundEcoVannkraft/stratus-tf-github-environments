@@ -36,20 +36,22 @@ jobs:
             if (isFirstContribution) {
               if (isPR) {
                 // Welcome message for first-time PR contributors
-                const welcomeMessage = `## 🎉 Welcome to the community!
-
-Thank you for your first contribution to this project! 🚀
-
-Here's what happens next:
-- 🤖 Our automated checks will run to validate your changes
-- 👀 A maintainer will review your pull request
-- 💬 Feel free to ask questions in the comments if you need help
-
-### 📚 Helpful Resources
-- [Contributing Guide](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/CONTRIBUTING.md)
-- [Support Documentation](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/.github/SUPPORT.md)
-
-We appreciate your contribution and look forward to working with you! 🤝`;
+                const welcomeMessage = [
+                  "## 🎉 Welcome to the community!",
+                  "",
+                  "Thank you for your first contribution to this project! 🚀",
+                  "",
+                  "Here's what happens next:",
+                  "- 🤖 Our automated checks will run to validate your changes",
+                  "- 👀 A maintainer will review your pull request",
+                  "- 💬 Feel free to ask questions in the comments if you need help",
+                  "",
+                  "### 📚 Helpful Resources",
+                  `- [Contributing Guide](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/CONTRIBUTING.md)`,
+                  `- [Support Documentation](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/.github/SUPPORT.md)`,
+                  "",
+                  "We appreciate your contribution and look forward to working with you! 🤝"
+                ].join('\n');
 
                 await github.rest.issues.createComment({
                   issue_number: context.issue.number,
@@ -69,21 +71,23 @@ We appreciate your contribution and look forward to working with you! 🤝`;
               
               if (isIssue) {
                 // Welcome message for first-time issue creators
-                const welcomeMessage = `## 👋 Welcome!
-
-Thank you for opening your first issue! We appreciate you taking the time to contribute.
-
-### What happens next?
-- 🏷️ A maintainer will add appropriate labels to categorize your issue
-- 📋 We'll review the details and ask for clarification if needed
-- 🔄 We'll keep you updated on progress
-
-### 💡 Tips for faster resolution
-- Provide as much detail as possible
-- Include examples or screenshots if relevant
-- Check our [documentation](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/README.md) for common solutions
-
-Thanks for helping make this project better! 🌟`;
+                const welcomeMessage = [
+                  "## 👋 Welcome!",
+                  "",
+                  "Thank you for opening your first issue! We appreciate you taking the time to contribute.",
+                  "",
+                  "### What happens next?",
+                  "- 🏷️ A maintainer will add appropriate labels to categorize your issue",
+                  "- 📋 We'll review the details and ask for clarification if needed",
+                  "- 🔄 We'll keep you updated on progress",
+                  "",
+                  "### 💡 Tips for faster resolution",
+                  "- Provide as much detail as possible",
+                  "- Include examples or screenshots if relevant",
+                  `- Check our [documentation](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/README.md) for common solutions`,
+                  "",
+                  "Thanks for helping make this project better! 🌟"
+                ].join('\n');
 
                 await github.rest.issues.createComment({
                   issue_number: context.issue.number,
