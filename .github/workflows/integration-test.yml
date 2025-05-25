@@ -66,7 +66,7 @@ permissions:
 jobs:
   prepare:
     name: Prepare Test Matrix
-    runs-on: ubuntu-latest
+    runs-on: stratus-github-hosted
     environment: integration-test
     timeout-minutes: 15
     outputs:
@@ -262,7 +262,7 @@ jobs:
   # Sequential processing: each test file runs completely before the next one starts
   test-sequential:
     name: Test ${{ matrix.github_env_file }}
-    runs-on: ubuntu-latest
+    runs-on: stratus-github-hosted
     needs: prepare
     timeout-minutes: 60
     environment: integration-test
@@ -1088,7 +1088,7 @@ jobs:
 
   report-results:
     name: Report Test Results
-    runs-on: ubuntu-latest
+    runs-on: stratus-github-hosted
     needs: [prepare, test-sequential]
     if: always() && github.event_name == 'pull_request'
     timeout-minutes: 10
