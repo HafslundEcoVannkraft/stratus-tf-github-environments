@@ -58,18 +58,27 @@ jobs:
             fi
           done <<< "$commits"
           
-          # Save results for the comment step (properly escaped)
+          # Save results for the comment step
           echo "total_commits=$total_commits" >> $GITHUB_ENV
           echo "conventional_commits=$conventional_commits" >> $GITHUB_ENV
           
-          # Use base64 encoding to safely pass multi-line content with special characters
-          echo "suggestions_b64<<EOF" >> $GITHUB_ENV
-          echo -e "$suggestions" | base64 -w 0 >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          # Use a simpler approach - escape special characters and use single quotes
+          # Replace problematic characters to make it safe for JavaScript
+          suggestions_safe=$(echo -e "$suggestions" | sed 's/`/\\`/g' | sed "s/'/\\'/g" | sed 's/"/\\"/g')
+          good_commits_safe=$(echo -e "$good_commits" | sed 's/`/\\`/g' | sed "s/'/\\'/g" | sed 's/"/\\"/g')
           
-          echo "good_commits_b64<<EOF" >> $GITHUB_ENV
-          echo -e "$good_commits" | base64 -w 0 >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          # Use a unique delimiter that won't appear in commit messages
+          {
+            echo 'suggestions_safe<<COMMIT_MSG_DELIMITER_END'
+            echo -e "$suggestions_safe"
+            echo 'COMMIT_MSG_DELIMITER_END'
+          } >> $GITHUB_ENV
+          
+          {
+            echo 'good_commits_safe<<COMMIT_MSG_DELIMITER_END'
+            echo -e "$good_commits_safe"
+            echo 'COMMIT_MSG_DELIMITER_END'
+          } >> $GITHUB_ENV
 
       - name: Comment with guidance
         if: github.event_name == 'pull_request'
@@ -79,11 +88,9 @@ jobs:
             const totalCommits = parseInt('${{ env.total_commits }}') || 0;
             const conventionalCommits = parseInt('${{ env.conventional_commits }}') || 0;
             
-            // Safely decode base64 encoded content
-            const suggestions = '${{ env.suggestions_b64 }}' ? 
-              Buffer.from('${{ env.suggestions_b64 }}', 'base64').toString('utf-8') : '';
-            const goodCommits = '${{ env.good_commits_b64 }}' ? 
-              Buffer.from('${{ env.good_commits_b64 }}', 'base64').toString('utf-8') : '';
+            // Get the safely escaped content
+            const suggestions = `${{ env.suggestions_safe }}`;
+            const goodCommits = `${{ env.good_commits_safe }}`;
             
             if (totalCommits === 0) return; // No commits to analyze
             
