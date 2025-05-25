@@ -9,6 +9,9 @@ permissions:
   contents: read
   pull-requests: write
   checks: write
+  issues: write  # Required for auto-labeling PRs
+  # Note: 'issues: write' permission would be needed for auto-labeling
+  # If not available, the workflow will suggest labels in a comment instead
 
 jobs:
   # Essential validation only - keep it simple for community contributors
