@@ -30,6 +30,12 @@ crash.*.log
 *.auto.tfvars
 *.auto.tfvars.json
 
+# Allow tfvars files in tests/ to be committed
+!tests/*.tfvars
+!tests/*.tfvars.json
+!tests/*.auto.tfvars
+!tests/*.auto.tfvars.json
+
 # Terraform override files - used for local development
 override.tf
 override.tf.json
