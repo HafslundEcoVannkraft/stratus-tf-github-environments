@@ -4,12 +4,12 @@ This directory contains testing infrastructure for the `stratus-tf-aca-gh-vendin
 
 ## 📋 **Test Types**
 
-### **1. Validation Tests (`validation_test.tf`)**
-- **Purpose**: Test configuration validation logic and business rules
-- **Dependencies**: None (uses mock data and test scenarios)
+### **1. Local Validation Script**
+- **Purpose**: Quick syntax and configuration validation during development
+- **Dependencies**: None (validates without deployment)
 - **Speed**: Fast (< 30 seconds)
-- **Use Case**: Development, CI/CD pipelines, configuration validation
-- **Runs**: Locally with `terraform plan/apply`
+- **Use Case**: Development feedback, pre-commit checks
+- **Runs**: From module root with `./scripts/test-local.sh`
 
 ### **2. Integration Tests (GitHub Actions)**
 - **Purpose**: Test the actual module deployment with real Azure/GitHub resources
@@ -26,46 +26,144 @@ This directory contains testing infrastructure for the `stratus-tf-aca-gh-vendin
 - ✅ **Backend configuration** exists in the module
 
 **Therefore:**
-- **Validation tests** test the logic without calling the module
+- **Local validation** tests syntax and configuration without calling the module
 - **Integration tests** run the module directly as a root module
 
-## 🚀 **Running Validation Tests**
+## 🚀 **Running Local Validation**
 
-Validation tests use standard Terraform features and work with any version >= 1.3.0:
+Use the local validation script for quick development feedback:
 
 ```bash
-# Navigate to tests directory
-cd tests
-
-# Initialize Terraform
-terraform init
-
-# Run validation tests
-terraform plan
-
-# Apply to see full results
-terraform apply -auto-approve
+# Run from module root directory
+./scripts/test-local.sh
 ```
+
+**What it validates:**
+- ✅ **Terraform syntax**: Format, initialization, validation
+- ✅ **YAML structure**: Configuration file syntax and structure
+- ✅ **Security checks**: Hardcoded secrets, TODO comments
+- ✅ **Documentation**: README completeness, examples
 
 **Expected Output:**
-```json
-{
-  "test_summary": {
-    "total_test_groups": 6,
-    "passed_groups": 5,
-    "failed_groups": 1,
-    "overall_status": "FAILED"
-  },
-  "test_coverage": {
-    "yaml_structure": "✅ YAML configuration structure validation",
-    "naming_validation": "✅ Naming convention validation", 
-    "security_policies": "✅ Security policy validation",
-    "policy_conflicts": "⚠️ Policy conflict detection (expected to find conflicts)",
-    "variable_secret_format": "✅ Variable and secret format validation",
-    "remote_state_structure": "✅ Remote state structure validation"
-  }
-}
 ```
+🧪 Local Testing for stratus-tf-aca-gh-vending
+==================================================
+✅ Terraform found: v1.12.1
+✅ Test configuration found
+✅ Code formatting is correct
+✅ Terraform initialization successful
+✅ Terraform validation passed
+✅ YAML syntax valid: tests/integration-github-environments.yaml
+✅ Configuration structure validation passed
+✅ Local validation completed successfully!
+```
+
+## 🎯 **What Each Test Type Validates**
+
+### **Local Validation:**
+- ✅ **Terraform syntax**: Format, initialization, validation
+- ✅ **YAML structure**: Configuration file syntax and structure
+- ✅ **Security checks**: Hardcoded secrets, TODO comments
+- ✅ **Documentation**: README completeness, examples
+
+### **Integration Tests:**
+- ✅ **Module execution**: Terraform init, plan, apply succeed
+- ✅ **Azure resources**: Managed identities and role assignments created
+- ✅ **GitHub integration**: Environments, variables, secrets configured
+- ✅ **Output validation**: Module outputs have expected structure
+- ✅ **API validation**: GitHub API confirms resource creation
+- ✅ **Cleanup**: All resources properly destroyed
+
+## 🔧 **Understanding Test Results**
+
+### **✅ Local Validation Results**
+- **Green checkmarks** indicate validation rules are working correctly
+- **⚠️ Expected failures** show conflict detection is working
+- **❌ Actual failures** indicate issues with validation logic
+
+### **✅ Integration Test Results**
+- **GitHub Actions** provides detailed logs and status
+- **PR comments** show test results and configuration
+- **Failed tests** include error details and cleanup status
+
+## 🛠 **Development Workflow**
+
+### **During Development:**
+```bash
+# Quick validation during development
+./scripts/test-local.sh
+```
+
+### **Before Committing:**
+```bash
+# Ensure local validation passes
+./scripts/test-local.sh
+
+# Fix any formatting issues
+terraform fmt -recursive .
+```
+
+### **Before Merging PR:**
+- ✅ **Local validation** passes locally
+- ✅ **Integration tests** pass in GitHub Actions
+- ✅ **PR comments** show successful test results
+
+## 📝 **Test Files**
+
+### **Local Validation:**
+- `./scripts/test-local.sh` - Local validation script
+
+### **Integration Tests:**
+- `.github/workflows/integration-test.yml` - GitHub Actions workflow
+- `integration-github-environments.yaml` - Comprehensive test configuration
+
+### **Documentation:**
+- `README.md` - This testing guide
+
+## 🔧 **Troubleshooting**
+
+### **Local Validation Not Running:**
+- Check Terraform version (requires >= 1.3.0)
+- Ensure you're in the module root directory (not tests/)
+- Run `chmod +x scripts/test-local.sh` if permission denied
+
+### **Integration Tests Failing:**
+
+**Authentication Issues:**
+- Verify Azure service principal has correct permissions
+- Check GitHub token has required scopes (`repo`, `workflow`, `read:org`)
+- Ensure OIDC is configured correctly
+
+**Resource Issues:**
+- Check Azure subscription limits
+- Verify test resource group exists
+- Ensure storage account is accessible
+
+**GitHub API Issues:**
+- Verify repository `stratus-tf-aca-gh-vending-test` exists
+- Check GitHub token permissions
+- Ensure team `stratus-az-platform-approvers` exists
+
+### **Adding New Tests:**
+
+**For Local Validation:**
+1. Add new validation scenarios to `./scripts/test-local.sh`
+2. Create new validation logic
+3. Add new checks
+4. Update documentation
+
+**For Integration Tests:**
+1. Modify `integration-github-environments.yaml`
+2. Update GitHub Actions workflow
+3. Add new validation steps
+4. Test manually first
+
+## 📚 **Related Documentation**
+
+- [Module Development](../README.md)
+- [Contributing Guide](../CONTRIBUTING.md)
+- [Troubleshooting Guide](../TROUBLESHOOTING.md)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
 
 ## 🔗 **Running Integration Tests**
 
@@ -136,117 +234,4 @@ repositories:
         variables:
           INTEGRATION_TEST: "true"
           TEST_TYPE: "apply"
-```
-
-## 🎯 **What Each Test Type Validates**
-
-### **Validation Tests:**
-- ✅ **Configuration structure**: YAML format and required fields
-- ✅ **Naming conventions**: Environment and repository naming
-- ✅ **Security policies**: Production environment requirements
-- ✅ **Policy conflicts**: Branch vs tag policy conflicts
-- ✅ **Variable format**: GitHub variable/secret naming
-- ✅ **Remote state structure**: Expected output format
-
-### **Integration Tests:**
-- ✅ **Module execution**: Terraform init, plan, apply succeed
-- ✅ **Azure resources**: Managed identities and role assignments created
-- ✅ **GitHub integration**: Environments, variables, secrets configured
-- ✅ **Output validation**: Module outputs have expected structure
-- ✅ **API validation**: GitHub API confirms resource creation
-- ✅ **Cleanup**: All resources properly destroyed
-
-## 🔧 **Understanding Test Results**
-
-### **✅ Validation Test Results**
-- **Green checkmarks** indicate validation rules are working correctly
-- **⚠️ Expected failures** show conflict detection is working
-- **❌ Actual failures** indicate issues with validation logic
-
-### **✅ Integration Test Results**
-- **GitHub Actions** provides detailed logs and status
-- **PR comments** show test results and configuration
-- **Failed tests** include error details and cleanup status
-
-## 🛠 **Development Workflow**
-
-### **During Development:**
-```bash
-# Quick validation during development
-cd tests
-terraform apply -auto-approve
-terraform output validation_test_results
-```
-
-### **Before Committing:**
-```bash
-# Ensure validation tests pass
-cd tests
-terraform apply -auto-approve
-
-# Check for any unexpected failures
-terraform output validation_test_results
-```
-
-### **Before Merging PR:**
-- ✅ **Validation tests** pass locally
-- ✅ **Integration tests** pass in GitHub Actions
-- ✅ **PR comments** show successful test results
-
-## 📝 **Test Files**
-
-### **Validation Tests:**
-- `validation_test.tf` - Main validation logic
-- `test-github-environments.yaml` - Example configuration
-
-### **Integration Tests:**
-- `.github/workflows/integration-test.yml` - GitHub Actions workflow
-- `integration-github-environments.yaml` - Comprehensive test configuration
-
-### **Documentation:**
-- `README.md` - This testing guide
-
-## 🔧 **Troubleshooting**
-
-### **Validation Tests Not Running:**
-- Check Terraform version (requires >= 1.3.0)
-- Ensure you're in the `tests/` directory
-- Run `terraform init` if providers are missing
-
-### **Integration Tests Failing:**
-
-**Authentication Issues:**
-- Verify Azure service principal has correct permissions
-- Check GitHub token has required scopes (`repo`, `workflow`, `read:org`)
-- Ensure OIDC is configured correctly
-
-**Resource Issues:**
-- Check Azure subscription limits
-- Verify test resource group exists
-- Ensure storage account is accessible
-
-**GitHub API Issues:**
-- Verify repository `stratus-tf-aca-gh-vending-test` exists
-- Check GitHub token permissions
-- Ensure team `stratus-az-platform-approvers` exists
-
-### **Adding New Tests:**
-
-**For Validation Tests:**
-1. Add new test scenarios to `locals.test_configs`
-2. Create new validation logic
-3. Add new `check` blocks
-4. Update documentation
-
-**For Integration Tests:**
-1. Modify `integration-github-environments.yaml`
-2. Update GitHub Actions workflow
-3. Add new validation steps
-4. Test manually first
-
-## 📚 **Related Documentation**
-
-- [Module Development](../README.md)
-- [Contributing Guide](../CONTRIBUTING.md)
-- [Troubleshooting Guide](../TROUBLESHOOTING.md)
-- [GitHub Actions Documentation](https://docs.github.com/en/actions) 
+``` 
