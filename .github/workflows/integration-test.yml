@@ -67,6 +67,7 @@ jobs:
   prepare:
     name: Prepare Test Matrix
     runs-on: ubuntu-latest
+    environment: integration-test
     timeout-minutes: 15
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
