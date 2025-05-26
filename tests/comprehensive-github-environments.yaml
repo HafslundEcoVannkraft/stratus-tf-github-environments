@@ -18,24 +18,19 @@ repositories:
           AZURE_REGION: "norwayeast"
           DEPLOYMENT_MODE: "complete"
         secrets:
-          - name: "TEST_SECRET"
-            value: "comprehensive-test-secret-value"
-          - name: "DEPLOYMENT_KEY"
-            value: "comprehensive-deployment-key"
-          - name: "API_TOKEN"
-            value: "comprehensive-api-token"
+          TEST_SECRET:
+            key_vault_name: "stratus-tf-aca-gh-vending-kv"
+            secret_name: "comprehensive"
         deployment_branch_policy:
           protected_branches: false
           custom_branch_policies: true
-          custom_branches: ["main", "develop", "feature/*", "hotfix/*"]
-        deployment_tag_policy:
-          enabled: true
-          tag_patterns: ["v*", "release-*", "hotfix-*", "rc-*"]
+          branch_pattern: ["main", "develop", "feature/*", "hotfix/*"]
+          tag_pattern: ["v*", "release-*", "hotfix-*", "rc-*"]
 
       # Edge case test - maximum wait timer
       - name: "max-wait-test"
         container_environment: "default"
-        wait_timer: 43200  # 12 hours - maximum allowed
+        wait_timer: 43200 # 12 hours - maximum allowed
         prevent_self_review: true
         reviewers:
           teams:
@@ -61,11 +56,9 @@ repositories:
           SECURITY_SCAN: "enabled"
           COMPLIANCE_CHECK: "strict"
         secrets:
-          - name: "SECURITY_TOKEN"
-            value: "security-test-token"
+          SECURITY_TOKEN:
+            key_vault_name: "my-key-vault"
+            secret_value: "my-secret"
         deployment_branch_policy:
           protected_branches: true
           custom_branch_policies: false
-        deployment_tag_policy:
-          enabled: true
-          tag_patterns: ["v*"] 

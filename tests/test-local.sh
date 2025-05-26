@@ -99,10 +99,10 @@ print_header "📄 YAML Configuration Validation"
 # Check if yq is available for YAML validation
 if command -v yq &> /dev/null; then
     print_status $BLUE "Validating YAML syntax..."
-    
+
     for yaml_file in tests/*.yaml examples/*.yaml; do
         if [[ -f "$yaml_file" ]]; then
-            if yq eval '.' "$yaml_file" > /dev/null 2>&1; then
+            if yq '.' "$yaml_file" > /dev/null 2>&1; then
                 print_success "YAML syntax valid: $yaml_file"
             else
                 print_error "YAML syntax invalid: $yaml_file"
@@ -177,7 +177,7 @@ if [[ -f "README.md" ]]; then
     if grep -q -i "examples\|configuration" README.md; then
         ((sections_found++))
     fi
-    
+
     if [[ $sections_found -ge 2 ]]; then
         print_success "README.md has essential sections"
     else
@@ -208,4 +208,4 @@ echo "  5. Create a PR to trigger automated testing"
 echo ""
 print_status $YELLOW "Note: This script only validates configuration and syntax."
 print_status $YELLOW "For full testing, use the GitHub Actions integration tests."
-print_status $YELLOW "See GITHUB_ENVIRONMENTS.md for environment setup instructions." 
+print_status $YELLOW "See GITHUB_ENVIRONMENTS.md for environment setup instructions."

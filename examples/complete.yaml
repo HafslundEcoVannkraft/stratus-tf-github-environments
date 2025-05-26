@@ -1,6 +1,6 @@
 # Complete configuration for Azure Container App GitHub Environments
 # This example demonstrates all available features and best practices
-# 
+#
 # Features demonstrated:
 # - Multiple repositories with different configurations
 # - Container App Environment mapping (container_environment property)
@@ -16,35 +16,35 @@ repositories:
     environments:
       # Development: Minimal restrictions for rapid iteration
       - name: dev-plan
-        container_environment: dev  # Maps to "dev" key in remote state environments
-        wait_timer: 0               # No wait time for development
-        prevent_self_review: false  # Allow self-approval for development
+        container_environment: dev # Maps to "dev" key in remote state environments
+        wait_timer: 0 # No wait time for development
+        prevent_self_review: false # Allow self-approval for development
         reviewers:
-          users: []                 # No required reviewers for plan operations
+          users: [] # No required reviewers for plan operations
           teams: []
         # No branch policy = any branch can trigger plan operations
         variables:
-          DEBUG_MODE: "true"         # Development-specific variables
+          DEBUG_MODE: "true" # Development-specific variables
           LOG_LEVEL: "debug"
           FEATURE_FLAGS: "experimental"
 
       - name: dev-apply
-        container_environment: dev  # Same Azure environment, different protections
-        wait_timer: 5               # Brief wait to prevent accidental deployments
-        prevent_self_review: true   # Require different person for approval
+        container_environment: dev # Same Azure environment, different protections
+        wait_timer: 5 # Brief wait to prevent accidental deployments
+        prevent_self_review: true # Require different person for approval
         reviewers:
           users:
-            - username: "dev-team-lead"  # Require team lead approval
+            - username: "dev-team-lead" # Require team lead approval
           teams:
-            - name: "developers"         # OR any developer team member
+            - name: "developers" # OR any developer team member
         deployment_branch_policy:
           protected_branches: false
           custom_branch_policies: true
-          custom_branches: ["main", "develop", "feature/*"]  # Allow feature branches
+          branch_pattern: ["main", "develop", "feature/*"] # Allow feature branches
 
       # Staging: Enhanced protections with shared Azure environment
       - name: staging-plan
-        container_environment: staging  # Maps to "staging" key in remote state
+        container_environment: staging # Maps to "staging" key in remote state
         wait_timer: 0
         prevent_self_review: false
         reviewers:
@@ -54,15 +54,15 @@ repositories:
 
       - name: staging-apply
         container_environment: staging
-        wait_timer: 10              # Longer wait for staging deployments
+        wait_timer: 10 # Longer wait for staging deployments
         prevent_self_review: true
         reviewers:
           users:
             - username: "staging-approver"
           teams:
-            - name: "qa-team"       # QA team must approve staging deployments
+            - name: "qa-team" # QA team must approve staging deployments
         deployment_branch_policy:
-          protected_branches: true  # Only protected branches can deploy
+          protected_branches: true # Only protected branches can deploy
           custom_branch_policies: false
         variables:
           ENVIRONMENT_TYPE: "staging"
@@ -70,9 +70,9 @@ repositories:
 
       # Production: Maximum security with tag-based deployments
       - name: prod-plan
-        container_environment: prod  # Maps to "prod" key in remote state environments
+        container_environment: prod # Maps to "prod" key in remote state environments
         wait_timer: 0
-        prevent_self_review: true   # Even plan operations require approval
+        prevent_self_review: true # Even plan operations require approval
         reviewers:
           users:
             - username: "prod-admin"
@@ -81,20 +81,19 @@ repositories:
 
       - name: prod-apply
         container_environment: prod
-        wait_timer: 30              # Extended wait time for production
+        wait_timer: 30 # Extended wait time for production
         prevent_self_review: true
         reviewers:
           users:
-            - username: "prod-admin"      # Multiple required approvers
+            - username: "prod-admin" # Multiple required approvers
             - username: "security-lead"
           teams:
-            - name: "platform-team"      # AND team approval required
+            - name: "platform-team" # AND team approval required
             - name: "security-team"
-        deployment_tag_policy:
-          enabled: true
-          tag_patterns:
-            - "v*"                  # Semantic version tags (v1.0.0, v2.1.3)
-            - "release-*"           # Release tags (release-2024.01)
+        deployment_branch_policy:
+          protected_branches: false
+          custom_branch_policies: true
+          tag_pattern: ["v*", "release-*"] # Semantic version tags (v1.0.0, v2.1.3) and Release tags (release-2024.01)
         variables:
           ENVIRONMENT_TYPE: "production"
           MONITORING_LEVEL: "enhanced"
@@ -105,7 +104,7 @@ repositories:
     environments:
       # Development: Simple configuration for background jobs
       - name: jobs-dev
-        container_environment: background-jobs  # Different Container App Environment
+        container_environment: background-jobs # Different Container App Environment
         wait_timer: 0
         prevent_self_review: false
         reviewers:
@@ -114,7 +113,7 @@ repositories:
         deployment_branch_policy:
           protected_branches: false
           custom_branch_policies: true
-          custom_branches: ["main", "feature/*", "hotfix/*"]
+          branch_pattern: ["main", "feature/*", "hotfix/*"]
         variables:
           JOB_CONCURRENCY: "5"
           BATCH_SIZE: "100"
@@ -123,15 +122,15 @@ repositories:
       # Production: Strict controls for background processing
       - name: jobs-prod
         container_environment: background-jobs-prod
-        wait_timer: 15              # Moderate wait time
+        wait_timer: 15 # Moderate wait time
         prevent_self_review: true
         reviewers:
           teams:
-            - name: "backend-team"  # Backend team owns background services
-        deployment_tag_policy:
-          enabled: true
-          tag_patterns:
-            - "v*"                  # Only version tags for production
+            - name: "backend-team" # Backend team owns background services
+        deployment_branch_policy:
+          protected_branches: false
+          custom_branch_policies: true
+          tag_pattern: ["v*"] # Only version tags for production
         variables:
           JOB_CONCURRENCY: "20"
           BATCH_SIZE: "1000"
@@ -142,7 +141,7 @@ repositories:
     environments:
       # API Development with feature branch support
       - name: api-dev-plan
-        container_environment: api-services  # Dedicated Container App Environment for APIs
+        container_environment: api-services # Dedicated Container App Environment for APIs
         wait_timer: 0
         prevent_self_review: false
         reviewers:
@@ -159,7 +158,7 @@ repositories:
         deployment_branch_policy:
           protected_branches: false
           custom_branch_policies: true
-          custom_branches: ["main", "api/*", "feature/api-*"]
+          branch_pattern: ["main", "api/*", "feature/api-*"]
         variables:
           API_VERSION: "v1"
           RATE_LIMITING: "development"
@@ -177,19 +176,17 @@ repositories:
           teams:
             - name: "api-team"
             - name: "platform-team"
-        deployment_tag_policy:
-          enabled: true
-          tag_patterns:
-            - "api-v*"              # API-specific version tags
-            - "stable-*"            # Stable release tags
+        deployment_branch_policy:
+          protected_branches: false
+          custom_branch_policies: true
+          tag_pattern: ["api-v*", "stable-*"] # API-specific version tags and Stable release tags
         variables:
           API_VERSION: "v1"
           RATE_LIMITING: "production"
           CORS_ORIGINS: "https://app.example.com,https://admin.example.com"
           SECURITY_HEADERS: "enabled"
-
 # Configuration Notes:
-# 
+#
 # 1. Container App Environment Mapping:
 #    - Each 'container_environment' maps to a key in the remote state's environments map
 #    - Multiple GitHub environments can target the same Container App Environment
@@ -200,10 +197,10 @@ repositories:
 #    - Apply environments: Write operations, strict approvals
 #    - Production: Tag-based deployments, multiple approvers, extended wait times
 #
-# 3. Branch vs Tag Policies:
-#    - Development: Branch-based for feature development
-#    - Production: Tag-based for controlled releases
-#    - Cannot mix protected_branches=true with tag policies (GitHub API limitation)
+# 3. Branch vs Tag Patterns:
+#    - Development: Branch-based patterns for feature development (using branch_pattern)
+#    - Production: Tag-based patterns for controlled releases (using tag_pattern)
+#    - Cannot mix protected_branches=true with tag_pattern (GitHub API limitation)
 #
 # 4. Variable Precedence:
 #    - Remote state variables (from infrastructure)

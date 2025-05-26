@@ -1,7 +1,7 @@
 # -----------------------------------------------------------------------------
 # locals.tf
 # Local values and data sources for the stratus-tf-aca-gh-vending module.
-# Handles YAML parsing, environment processing, remote state access, 
+# Handles YAML parsing, environment processing, remote state access,
 # role assignments, and GitHub API data lookups.
 # -----------------------------------------------------------------------------
 
@@ -350,8 +350,21 @@ locals {
         }))
 
         # Branch and tag deployment policies
-        branch_policy = try(env.deployment_branch_policy, try(local.github_environment_config.environments[try(env.container_environment, "default")].settings.deployment_branch_policy, null))
-        tag_policy    = try(env.deployment_tag_policy, try(local.github_environment_config.environments[try(env.container_environment, "default")].settings.deployment_tag_policy, null))
+        # Get branch policy configuration with branch_pattern and tag_pattern structure
+        branch_policy = try(
+          # Get deployment branch policy from environment config or use default values
+          env.deployment_branch_policy,
+          try(
+            local.github_environment_config.environments[try(env.container_environment, "default")].settings.deployment_branch_policy,
+            # Default to empty policy if nothing is defined
+            {
+              protected_branches : false,
+              custom_branch_policies : false,
+              branch_pattern : [],
+              tag_pattern : []
+            }
+          )
+        )
 
         # Environment-specific configuration
         variables = try(env.variables, {}) # Environment variables to set (YAML only, merged later)
@@ -382,7 +395,6 @@ locals {
 
           # Deployment policies
           branch_policy = try(env_item.deployment_branch_policy, null)
-          tag_policy    = try(env_item.deployment_tag_policy, null)
 
           # Environment data
           variables = try(env_item.variables, {})
@@ -399,9 +411,9 @@ locals {
   # Create a comprehensive map of environment variables for each environment
   # This provides environment variables from multiple sources:
   # 1. Remote state variables (from Azure environment-specific configuration)
-  # 2. Per-environment managed identity variables (unique per environment)  
+  # 2. Per-environment managed identity variables (unique per environment)
   # 3. Manual variables from YAML configuration (user-defined)
-  # 
+  #
   # Variable precedence (last wins): Remote State -> Per-Environment -> Manual
   # This allows users to override any automatically generated variable if needed
   environment_variables = {

@@ -17,25 +17,16 @@ repositories:
           ENVIRONMENT: "test"
           AZURE_REGION: "norwayeast"
           DEPLOYMENT_MODE: "complete"
-        secrets:
-          - name: "TEST_SECRET"
-            value: "comprehensive-test-secret-value"
-          - name: "DEPLOYMENT_KEY"
-            value: "comprehensive-deployment-key"
-          - name: "API_TOKEN"
-            value: "comprehensive-api-token"
         deployment_branch_policy:
           protected_branches: false
           custom_branch_policies: true
-          custom_branches: ["main", "develop", "feature/*", "hotfix/*"]
-        deployment_tag_policy:
-          enabled: true
-          tag_patterns: ["v*", "release-*", "hotfix-*", "rc-*"]
+          branch_pattern: ["main", "develop", "feature/*", "hotfix/*"]
+          tag_pattern: ["v*", "release-*", "hotfix-*", "rc-*"]
 
       # Edge case test - maximum wait timer
       - name: "max-wait-test"
         container_environment: "default"
-        wait_timer: 43200  # 12 hours - maximum allowed
+        wait_timer: 43200 # 12 hours - maximum allowed
         prevent_self_review: true
         reviewers:
           teams:
@@ -60,15 +51,9 @@ repositories:
           TEST_TYPE: "security"
           SECURITY_SCAN: "enabled"
           COMPLIANCE_CHECK: "strict"
-        secrets:
-          - name: "SECURITY_TOKEN"
-            value: "security-test-token"
         deployment_branch_policy:
           protected_branches: true
           custom_branch_policies: false
-        deployment_tag_policy:
-          enabled: true
-          tag_patterns: ["v*"]
 
       # Test environment for plan operations
       - name: "integration-test-plan"
@@ -79,13 +64,10 @@ repositories:
           INTEGRATION_TEST: "true"
           TEST_TYPE: "plan"
           AZURE_REGION: "norwayeast"
-        secrets:
-          - name: "TEST_SECRET"
-            value: "integration-test-secret-value"
         deployment_branch_policy:
           protected_branches: false
           custom_branch_policies: true
-          custom_branches: ["main", "develop", "integration-test"]
+          branch_pattern: ["main", "develop", "integration-test"]
 
       # Test environment for apply operations with security controls
       - name: "integration-test-apply"
@@ -102,14 +84,10 @@ repositories:
           TEST_TYPE: "apply"
           ENVIRONMENT: "test"
           AZURE_REGION: "norwayeast"
-        secrets:
-          - name: "TEST_SECRET"
-            value: "integration-test-apply-secret"
-          - name: "DEPLOYMENT_KEY"
-            value: "test-deployment-key-value"
-        deployment_tag_policy:
-          enabled: true
-          tag_patterns: ["v*", "release-*", "test-*"]
+        deployment_branch_policy:
+          protected_branches: false
+          custom_branch_policies: true
+          tag_pattern: ["v*", "release-*", "test-*"]
 
       # Test environment with minimal configuration
       - name: "integration-test-minimal"
@@ -120,11 +98,11 @@ repositories:
       # Test environment with maximum wait timer
       - name: "integration-test-max-wait"
         container_environment: "default"
-        wait_timer: 43200  # 12 hours - maximum allowed
+        wait_timer: 43200 # 12 hours - maximum allowed
         prevent_self_review: true
         reviewers:
           teams:
             - name: "stratus-az-platform-approvers"
         variables:
           MAX_WAIT_TEST: "true"
-          WAIT_TIMER: "43200" 
+          WAIT_TIMER: "43200"

@@ -67,12 +67,12 @@ locals {
       valid = alltrue([
         for env in local.environments :
         env.branch_policy == null || (
-          # Cannot have both protected_branches and tag_policy enabled
-          !(try(env.branch_policy.protected_branches, false) && try(env.tag_policy.enabled, false))
+          # Cannot have both protected_branches and tag patterns enabled
+          !(try(env.branch_policy.protected_branches, false) && try(length(env.branch_policy.tag_pattern), 0) > 0)
         )
       ])
-      error_message = "Cannot use protected_branches with tag policies due to GitHub API limitations"
-      remediation   = "Use either protected branches OR tag policies, not both"
+      error_message = "Cannot use protected_branches with tag patterns due to GitHub API limitations"
+      remediation   = "Use either protected branches OR tag patterns, not both"
     }
 
     # Resource naming collision detection
@@ -144,15 +144,15 @@ check "github_api_prerequisites" {
     // We use nonsensitive for the github token to avoid terraform errors, we only output the length of the token not the token itself
     error_message = <<-EOT
       GitHub API prerequisites not met:
-      
+
       Required:
       - GitHub token with 'repo', 'workflow', 'read:org' scopes
       - Valid GitHub organization or user name
-      
+
       Current status:
       - Token provided: ${length(nonsensitive(var.github_token)) > 10 ? "✅" : "❌"}
       - Owner specified: ${length(var.github_owner) > 0 ? "✅" : "❌"}
-      
+
       Generate token at: https://github.com/settings/tokens
     EOT
   }
@@ -163,10 +163,10 @@ check "azure_prerequisites" {
     condition     = can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.subscription_id))
     error_message = <<-EOT
       Azure prerequisites not met:
-      
+
       Issues found:
       - Subscription ID format: ${can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.subscription_id)) ? "✅" : "❌ Invalid UUID format"}
-      
+
       Verify your Azure subscription ID in the Azure portal.
     EOT
   }
@@ -204,4 +204,4 @@ locals {
       local.deployment_readiness.readiness_score >= 50 ? "NEEDS_WORK" : "NOT_READY"
     )
   )
-} 
+}

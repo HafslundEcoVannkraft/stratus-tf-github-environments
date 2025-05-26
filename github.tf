@@ -132,26 +132,73 @@ resource "time_sleep" "wait_for_environment" {
 # =============================================================================
 
 # Create deployment policies with enhanced error handling
-resource "github_repository_environment_deployment_policy" "environment_policies" {
+resource "github_repository_environment_deployment_policy" "branch_policies" {
+  # Create branch pattern policies
   for_each = {
-    for env in local.environments : "${env.repository}:${env.environment}" => env
-    if(
-      # Include environments with custom branch policies
-      (env.branch_policy != null && try(env.branch_policy.custom_branch_policies, false) == true) ||
-      # OR environments with tag policies ONLY if they don't also have protected_branches
-      (env.tag_policy != null && try(env.tag_policy.enabled, false) &&
-      !(env.branch_policy != null && try(env.branch_policy.protected_branches, false) == true))
-    )
+    for item in flatten([
+      for env in local.environments : [
+        # For each branch pattern in the branch_pattern array
+        for pattern in try(env.branch_policy.branch_pattern, []) : {
+          key                = "${env.repository}:${env.environment}:branch:${pattern}"
+          repository         = env.repository
+          environment        = env.environment
+          branch_pattern     = pattern
+          protected_branches = try(env.branch_policy.protected_branches, false)
+        }
+      ]
+    ]) : item.key => item
+    if try(length(item.branch_pattern), 0) > 0
+  }
+
+  repository     = each.value.repository
+  environment    = each.value.environment
+  branch_pattern = each.value.branch_pattern
+
+  # Lifecycle block to ensure we don't create invalid configurations
+  lifecycle {
+    # Verify branch pattern is not used with protected branches
+    precondition {
+      condition     = !each.value.protected_branches
+      error_message = "Error: Branch pattern '${each.value.branch_pattern}' cannot be used with protected_branches=true in environment: ${each.value.repository}:${each.value.environment}"
+    }
+  }
+
+  depends_on = [
+    github_repository_environment.env,
+    time_sleep.wait_for_environment
+  ]
+}
+
+resource "github_repository_environment_deployment_policy" "tag_policies" {
+  # Create tag pattern policies
+  for_each = {
+    for item in flatten([
+      for env in local.environments : [
+        # For each tag pattern in the tag_pattern array
+        for pattern in try(env.branch_policy.tag_pattern, []) : {
+          key                = "${env.repository}:${env.environment}:tag:${pattern}"
+          repository         = env.repository
+          environment        = env.environment
+          tag_pattern        = pattern
+          protected_branches = try(env.branch_policy.protected_branches, false)
+        }
+      ]
+    ]) : item.key => item
+    if try(length(item.tag_pattern), 0) > 0
   }
 
   repository  = each.value.repository
   environment = each.value.environment
+  tag_pattern = each.value.tag_pattern
 
-  # Enhanced pattern selection with validation
-  branch_pattern = coalesce(
-    try(each.value.tag_policy.enabled, false) ? "refs/tags/*" : null,
-    try(each.value.branch_policy.custom_branches[0], "main")
-  )
+  # Lifecycle block to ensure we don't create invalid configurations
+  lifecycle {
+    # Verify tag pattern is not used with protected branches
+    precondition {
+      condition     = !each.value.protected_branches
+      error_message = "Error: Tag pattern '${each.value.tag_pattern}' cannot be used with protected_branches=true in environment: ${each.value.repository}:${each.value.environment}"
+    }
+  }
 
   depends_on = [
     github_repository_environment.env,

@@ -3,14 +3,19 @@
   "title": "GitHub Container App Environments Configuration",
   "description": "Schema for defining GitHub repositories, environments, and their configurations for Azure Container Apps",
   "type": "object",
-  "required": ["repositories"],
+  "required": [
+    "repositories"
+  ],
   "properties": {
     "repositories": {
       "type": "array",
       "description": "List of GitHub repositories to configure",
       "items": {
         "type": "object",
-        "required": ["repo", "environments"],
+        "required": [
+          "repo",
+          "environments"
+        ],
         "properties": {
           "repo": {
             "type": "string",
@@ -21,7 +26,9 @@
             "description": "List of GitHub environments to create",
             "items": {
               "type": "object",
-              "required": ["name"],
+              "required": [
+                "name"
+              ],
               "properties": {
                 "name": {
                   "type": "string",
@@ -52,7 +59,9 @@
                       "description": "GitHub users who must approve deployments",
                       "items": {
                         "type": "object",
-                        "required": ["username"],
+                        "required": [
+                          "username"
+                        ],
                         "properties": {
                           "username": {
                             "type": "string",
@@ -77,8 +86,16 @@
                           }
                         },
                         "oneOf": [
-                          { "required": ["name"] },
-                          { "required": ["slug"] }
+                          {
+                            "required": [
+                              "name"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "slug"
+                            ]
+                          }
                         ]
                       }
                     }
@@ -86,7 +103,7 @@
                 },
                 "deployment_branch_policy": {
                   "type": "object",
-                  "description": "Branch protection policy for deployments",
+                  "description": "Branch and tag protection policy for deployments",
                   "properties": {
                     "protected_branches": {
                       "type": "boolean",
@@ -95,34 +112,23 @@
                     },
                     "custom_branch_policies": {
                       "type": "boolean",
-                      "description": "Allow deployments from specific branches",
+                      "description": "Allow deployments from specific branches or tags",
                       "default": false
                     },
-                    "custom_branches": {
+                    "branch_pattern": {
                       "type": "array",
                       "description": "List of branch patterns for custom branch policy",
                       "items": {
                         "type": "string",
                         "description": "Branch pattern (e.g. 'main', 'release/*')"
                       }
-                    }
-                  }
-                },
-                "deployment_tag_policy": {
-                  "type": "object",
-                  "description": "Tag-based deployment policy to control which tags can deploy to an environment (does not prevent tag deletion)",
-                  "properties": {
-                    "enabled": {
-                      "type": "boolean",
-                      "description": "Enable tag-based deployments",
-                      "default": false
                     },
-                    "tag_patterns": {
+                    "tag_pattern": {
                       "type": "array",
                       "description": "List of tag patterns that are allowed to deploy to this environment",
                       "items": {
                         "type": "string",
-                        "description": "Tag pattern (e.g. 'v*', 'release/*')"
+                        "description": "Tag pattern (e.g. 'v*', 'release-*')"
                       }
                     }
                   }
@@ -140,10 +146,19 @@
                   "description": "Secrets to create for this environment. Each key is the secret name, value is an object with key_vault_name and secret_name.",
                   "additionalProperties": {
                     "type": "object",
-                    "required": ["key_vault_name", "secret_name"],
+                    "required": [
+                      "key_vault_name",
+                      "secret_name"
+                    ],
                     "properties": {
-                      "key_vault_name": { "type": "string", "description": "Azure Key Vault name" },
-                      "secret_name": { "type": "string", "description": "Secret name in Key Vault" }
+                      "key_vault_name": {
+                        "type": "string",
+                        "description": "Azure Key Vault name"
+                      },
+                      "secret_name": {
+                        "type": "string",
+                        "description": "Secret name in Key Vault"
+                      }
                     }
                   }
                 },
@@ -163,32 +178,32 @@
                           "description": "Branch protection policy for deployments",
                           "properties": {
                             "protected_branches": {
-                              "enum": [true],
-                              "description": "Only allow deployments from protected branches (incompatible with tag policies)"
+                              "enum": [
+                                true
+                              ],
+                              "description": "Only allow deployments from protected branches (incompatible with tag patterns)"
                             },
                             "custom_branch_policies": {
-                              "enum": [false],
+                              "enum": [
+                                false
+                              ],
                               "description": "Allow deployments from specific branches"
                             },
-                            "custom_branches": {
+                            "branch_pattern": {
                               "type": "array",
                               "description": "List of branch patterns for custom branch policy (not used with protected_branches)"
+                            },
+                            "tag_pattern": {
+                              "type": "array",
+                              "description": "List of tag patterns (incompatible with protected_branches=true)"
                             }
                           }
                         },
                         "deployment_tag_policy": {
-                          "type": "object",
-                          "description": "Tag-based deployment policy (incompatible with protected branches)",
-                          "properties": {
-                            "enabled": {
-                              "enum": [false],
-                              "description": "Enable tag-based deployments"
-                            },
-                            "tag_patterns": {
-                              "type": "array",
-                              "description": "List of tag patterns (not used when enabled is false)"
-                            }
-                          }
+                          "not": {
+                            "type": "object"
+                          },
+                          "description": "Tag-based deployment policy has been deprecated, use tag_pattern property inside deployment_branch_policy instead"
                         }
                       }
                     },
@@ -199,38 +214,38 @@
                           "description": "Branch protection policy for deployments",
                           "properties": {
                             "protected_branches": {
-                              "enum": [false],
+                              "enum": [
+                                false
+                              ],
                               "description": "Only allow deployments from protected branches"
                             },
                             "custom_branch_policies": {
                               "type": "boolean",
-                              "description": "Allow deployments from specific branches"
+                              "description": "Allow deployments from specific branches or tags"
                             },
-                            "custom_branches": {
+                            "branch_pattern": {
                               "type": "array",
                               "description": "List of branch patterns for custom branch policy"
-                            }
-                          }
-                        },
-                        "deployment_tag_policy": {
-                          "type": "object",
-                          "description": "Tag-based deployment policy to control which tags can deploy to an environment (does not prevent tag deletion)",
-                          "properties": {
-                            "enabled": {
-                              "type": "boolean",
-                              "description": "Enable tag-based deployments"
                             },
-                            "tag_patterns": {
+                            "tag_pattern": {
                               "type": "array",
                               "description": "List of tag patterns that are allowed to deploy to this environment"
                             }
                           }
+                        },
+                        "deployment_tag_policy": {
+                          "not": {
+                            "type": "object"
+                          },
+                          "description": "Tag-based deployment policy has been deprecated, use tag_pattern property inside deployment_branch_policy instead"
                         }
                       }
                     },
                     {
                       "not": {
-                        "required": ["deployment_branch_policy", "deployment_tag_policy"]
+                        "required": [
+                          "deployment_branch_policy"
+                        ]
                       }
                     }
                   ]
@@ -242,4 +257,4 @@
       }
     }
   }
-} 
+}
