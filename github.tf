@@ -80,14 +80,17 @@ resource "github_repository_environment" "env" {
     }
   }
 
-  # Add deployment branch policy if configured
+  # # Add deployment branch policy if configured
   dynamic "deployment_branch_policy" {
-    for_each = each.value.branch_policy != null || (each.value.tag_policy != null && try(each.value.tag_policy.enabled, false)) ? [1] : []
+    for_each = (
+      each.value.branch_policy != null &&
+      !try(each.value.branch_policy.custom_branch_policies, false) &&
+      try(each.value.branch_policy.protected_branches, false)
+    ) ? [1] : []
 
     content {
-      # Use branch policy settings, or enable custom policies if tag policies are enabled
       protected_branches     = try(each.value.branch_policy.protected_branches, false)
-      custom_branch_policies = coalesce(try(each.value.branch_policy.custom_branch_policies, null), try(each.value.tag_policy.enabled, false), false)
+      custom_branch_policies = false
     }
   }
 
@@ -162,26 +165,6 @@ resource "github_repository_environment_deployment_policy" "environment_policies
     github_repository_environment.env,
     time_sleep.wait_for_environment
   ]
-
-  # Enhanced lifecycle rules to handle GitHub API inconsistencies
-  # lifecycle {
-  #   create_before_destroy = true
-
-  #   # Add precondition to validate pattern
-  #   precondition {
-  #     condition = length(coalesce(
-  #       try(each.value.tag_policy.enabled, false) ? "refs/tags/*" : null,
-  #       try(each.value.branch_policy.custom_branches[0], "main")
-  #     )) > 0
-  #     error_message = "Branch pattern cannot be empty for environment ${each.value.repository}:${each.value.environment}"
-  #   }
-
-  #   # Add postcondition to verify creation
-  #   postcondition {
-  #     condition     = self.branch_pattern != null
-  #     error_message = "Failed to create deployment policy for ${each.value.repository}:${each.value.environment}"
-  #   }
-  # }
 }
 
 # =============================================================================

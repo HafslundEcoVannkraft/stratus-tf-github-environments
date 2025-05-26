@@ -130,9 +130,9 @@ locals {
 #     condition     = local.enhanced_validation_passed
 #     error_message = <<-EOT
 #       Configuration validation failed. Please fix the following issues:
-      
+
 #       ${join("\n", nonsensitive(local.validation_error_report))}
-      
+
 #       For more help, see: https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/blob/main/README.md#troubleshooting
 #     EOT
 #   }
