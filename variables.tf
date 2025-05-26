@@ -159,17 +159,16 @@ variable "resource_group_suffix" {
   type        = string
   default     = null
 
-  validation {
-    condition = (
-      var.resource_group_suffix == null ||
-      (
-        can(length(var.resource_group_suffix)) &&
-        length(var.resource_group_suffix) <= 10 &&
-        can(regex("^[a-z0-9]+$", var.resource_group_suffix))
-      )
-    )
-    error_message = "If provided, resource_group_suffix must be <= 10 lowercase alphanumeric characters."
-  }
+  # validation {
+  #   condition = (
+  #     var.resource_group_suffix == null ||
+  #     (
+  #       length(var.resource_group_suffix) <= 10 &&
+  #       can(regex("^[a-z0-9]+$", var.resource_group_suffix))
+  #     )
+  #   )
+  #   error_message = "If provided, resource_group_suffix must be <= 10 lowercase alphanumeric characters."
+  # }
 }
 
 variable "module_repo_ref" {
@@ -184,7 +183,7 @@ variable "module_repo_ref" {
 }
 
 variable "iac_repo_url" {
-  description = "Optional: URL of the IaC repository that deployed these resources for tracking purposes."
+  description = "Optional: URL of the IaC repository that deployed these resources for tracking purposes. Only used for tagging if provided."
   type        = string
   default     = null
 

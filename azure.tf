@@ -103,7 +103,7 @@ module "managed_identity_app_repositories" {
 
   for_each = { for item in local.flattened_repo_environments : item.key => item }
 
-  name                = "${local.naming.managed_identity_prefix}-${each.value.azure_resource_key}"
+  name                = "${local.naming.managed_identity_prefix}-${each.value.repo}-${each.value.environment}"
   location            = var.location
   resource_group_name = azurerm_resource_group.github_identities.name
   enable_telemetry    = true
