@@ -81,17 +81,9 @@ resource "github_repository_environment" "env" {
   }
 
   # Add deployment branch policy if configured
-  dynamic "deployment_branch_policy" {
-    for_each = (
-      each.value.branch_policy != null &&
-      !try(each.value.branch_policy.custom_branch_policies, false) &&
-      try(each.value.branch_policy.protected_branches, false)
-    ) ? [1] : []
-
-    content {
-      protected_branches     = true
-      custom_branch_policies = false
-    }
+  deployment_branch_policy {
+    protected_branches     = try(each.value.branch_policy.protected_branches, false)
+    custom_branch_policies = try(each.value.branch_policy.custom_branch_policies, false)
   }
 
   # Enhanced lifecycle management
