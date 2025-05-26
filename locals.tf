@@ -296,7 +296,10 @@ locals {
     !local.validation_checks.has_environments ? "At least one environment must be defined in YAML." : null,
     !local.validation_checks.yaml_is_valid ? "YAML file is not valid or cannot be parsed." : null,
     !local.no_duplicate_environments ? "Duplicate environment names found (repo:name must be unique)." : null
-  ] # Add more checks as needed
+  ]
+
+  # Filtered validation errors (no nulls)
+  validation_errors_filtered = [for e in local.validation_errors : e if e != null]
 
   # Minimum deployment requirements check
   minimum_deployment_requirements = {

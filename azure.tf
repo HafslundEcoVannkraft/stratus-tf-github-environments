@@ -14,7 +14,7 @@
 check "yaml_configuration_valid" {
   assert {
     condition     = local.validation_passed
-    error_message = "YAML configuration validation failed:\n${join("\n", local.validation_errors)}"
+    error_message = "YAML configuration validation failed:\n${join("\n", local.validation_errors_filtered)}"
   }
 }
 
@@ -30,7 +30,7 @@ check "minimum_deployment_requirements" {
       - Code name and environment are specified
       
       Current validation errors:
-      ${join("\n", local.validation_errors)}
+      ${join("\n", local.validation_errors_filtered)}
     EOT
   }
 }

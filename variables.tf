@@ -155,13 +155,13 @@ variable "remote_state_key" {
 }
 
 variable "resource_group_suffix" {
-  description = "Optional: Custom suffix for the resource group name. If not provided, a random suffix will be generated."
+  description = "Optional: Suffix for the resource group name. Must be <= 10 lowercase alphanumeric characters."
   type        = string
   default     = null
 
   validation {
-    condition     = var.resource_group_suffix == null || (length(var.resource_group_suffix) <= 10 && can(regex("^[a-z0-9]+$", var.resource_group_suffix)))
-    error_message = "Resource group suffix must be 10 characters or less, lowercase letters and numbers only."
+    condition     = var.resource_group_suffix == null || (var.resource_group_suffix != null && length(var.resource_group_suffix) <= 10 && can(regex("^[a-z0-9]+$", var.resource_group_suffix)))
+    error_message = "If provided, resource_group_suffix must be <= 10 lowercase alphanumeric characters."
   }
 }
 
