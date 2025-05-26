@@ -160,7 +160,14 @@ variable "resource_group_suffix" {
   default     = null
 
   validation {
-    condition     = var.resource_group_suffix == null || (var.resource_group_suffix != null && length(var.resource_group_suffix) <= 10 && can(regex("^[a-z0-9]+$", var.resource_group_suffix)))
+    condition = (
+      var.resource_group_suffix == null ||
+      (
+        can(length(var.resource_group_suffix)) &&
+        length(var.resource_group_suffix) <= 10 &&
+        can(regex("^[a-z0-9]+$", var.resource_group_suffix))
+      )
+    )
     error_message = "If provided, resource_group_suffix must be <= 10 lowercase alphanumeric characters."
   }
 }
