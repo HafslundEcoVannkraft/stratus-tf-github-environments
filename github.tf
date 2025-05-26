@@ -80,7 +80,7 @@ resource "github_repository_environment" "env" {
     }
   }
 
-  # # Add deployment branch policy if configured
+  # Add deployment branch policy if configured
   dynamic "deployment_branch_policy" {
     for_each = (
       each.value.branch_policy != null &&
@@ -89,7 +89,7 @@ resource "github_repository_environment" "env" {
     ) ? [1] : []
 
     content {
-      protected_branches     = try(each.value.branch_policy.protected_branches, false)
+      protected_branches     = true
       custom_branch_policies = false
     }
   }
