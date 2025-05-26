@@ -347,3 +347,40 @@ output "data_source_optimization" {
   }
 }
 
+# Debug output the yaml 
+output "yaml_github_environment_config" {
+  description = "YAML GitHub environment configuration"
+  value       = local.yaml_github_environment_config
+}
+
+# Debug local.environments_map
+output "debug_local_environments_map" {
+  description = "Local environments map"
+  value       = local.environments_map
+}
+
+# Debug output the local.github_environment_config
+output "remote_state_github_environment_config" {
+  description = "GitHub environment configuration"
+  value       = local.github_environment_config
+}
+
+output "debug_raw_yaml_content" {
+  description = "Raw YAML content as read from the github_env_file input."
+  value       = local.yaml_content
+}
+
+output "debug_parsed_yaml_config" {
+  description = "Parsed YAML configuration (yamldecode of the input YAML file)."
+  value       = local.yaml_github_environment_config
+}
+
+output "debug_remote_state_github_environment_config" {
+  description = "GitHub environment configuration from remote state."
+  value       = local.github_environment_config
+}
+
+output "debug_final_environments_list" {
+  description = "Final list of environments as used by the module (flattened and processed)."
+  value       = local.environments
+}

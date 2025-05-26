@@ -504,5 +504,9 @@ locals {
     no_duplicate_environments         = local.no_duplicate_environments
     container_environments_valid      = local.container_environments_valid
   }
+
+  # Debug: Parsed YAML configuration
+  yaml_github_environment_config = yamldecode(local.yaml_content)
+
 }
 
