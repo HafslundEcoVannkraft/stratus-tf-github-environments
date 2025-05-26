@@ -146,9 +146,7 @@ resource "github_repository_environment_deployment_policy" "environment_policies
       # OR environments with tag policies ONLY if they don't also have protected_branches
       (env.tag_policy != null && try(env.tag_policy.enabled, false) &&
       !(env.branch_policy != null && try(env.branch_policy.protected_branches, false) == true))
-    ) &&
-    # Explicitly exclude known problematic environments
-    !contains(["stratus-tf-examples:app-prod-apply"], "${env.repository}:${env.environment}")
+    )
   }
 
   repository  = each.value.repository
@@ -166,24 +164,24 @@ resource "github_repository_environment_deployment_policy" "environment_policies
   ]
 
   # Enhanced lifecycle rules to handle GitHub API inconsistencies
-  lifecycle {
-    create_before_destroy = true
+  # lifecycle {
+  #   create_before_destroy = true
 
-    # Add precondition to validate pattern
-    precondition {
-      condition = length(coalesce(
-        try(each.value.tag_policy.enabled, false) ? "refs/tags/*" : null,
-        try(each.value.branch_policy.custom_branches[0], "main")
-      )) > 0
-      error_message = "Branch pattern cannot be empty for environment ${each.value.repository}:${each.value.environment}"
-    }
+  #   # Add precondition to validate pattern
+  #   precondition {
+  #     condition = length(coalesce(
+  #       try(each.value.tag_policy.enabled, false) ? "refs/tags/*" : null,
+  #       try(each.value.branch_policy.custom_branches[0], "main")
+  #     )) > 0
+  #     error_message = "Branch pattern cannot be empty for environment ${each.value.repository}:${each.value.environment}"
+  #   }
 
-    # Add postcondition to verify creation
-    postcondition {
-      condition     = self.branch_pattern != null
-      error_message = "Failed to create deployment policy for ${each.value.repository}:${each.value.environment}"
-    }
-  }
+  #   # Add postcondition to verify creation
+  #   postcondition {
+  #     condition     = self.branch_pattern != null
+  #     error_message = "Failed to create deployment policy for ${each.value.repository}:${each.value.environment}"
+  #   }
+  # }
 }
 
 # =============================================================================

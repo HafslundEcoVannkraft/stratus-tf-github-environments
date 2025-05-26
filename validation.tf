@@ -140,7 +140,8 @@ check "enhanced_configuration_validation" {
 
 check "github_api_prerequisites" {
   assert {
-    condition     = length(var.github_token) > 10 && length(var.github_owner) > 0
+    condition = length(var.github_token) > 10 && length(var.github_owner) > 0
+    // We use nonsensitive for the github token to avoid terraform errors, we only output the length of the token not the token itself
     error_message = <<-EOT
       GitHub API prerequisites not met:
       
@@ -149,7 +150,7 @@ check "github_api_prerequisites" {
       - Valid GitHub organization or user name
       
       Current status:
-      - Token provided: ${length(var.github_token) > 10 ? "✅" : "❌"}
+      - Token provided: ${length(nonsensitive(var.github_token)) > 10 ? "✅" : "❌"}
       - Owner specified: ${length(var.github_owner) > 0 ? "✅" : "❌"}
       
       Generate token at: https://github.com/settings/tokens
