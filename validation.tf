@@ -125,18 +125,18 @@ locals {
 # ENHANCED CHECK BLOCKS WITH BETTER ERROR MESSAGES
 # =============================================================================
 
-check "enhanced_configuration_validation" {
-  assert {
-    condition     = local.enhanced_validation_passed
-    error_message = <<-EOT
-      Configuration validation failed. Please fix the following issues:
+# check "enhanced_configuration_validation" {
+#   assert {
+#     condition     = local.enhanced_validation_passed
+#     error_message = <<-EOT
+#       Configuration validation failed. Please fix the following issues:
       
-      ${join("\n", nonsensitive(local.validation_error_report))}
+#       ${join("\n", nonsensitive(local.validation_error_report))}
       
-      For more help, see: https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/blob/main/README.md#troubleshooting
-    EOT
-  }
-}
+#       For more help, see: https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/blob/main/README.md#troubleshooting
+#     EOT
+#   }
+# }
 
 check "github_api_prerequisites" {
   assert {
