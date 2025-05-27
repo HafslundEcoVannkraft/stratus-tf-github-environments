@@ -56,9 +56,9 @@ flowchart LR
         end
 
         subgraph "Result: New Environments"
-            E[GitHub<br>Environment 1]
-            F[GitHub<br>Environment 2]
-            G[GitHub<br>Environment N]
+            E[Repo A<br>Environment 1]
+            F[Repo A<br>Environment 2]
+            G[Repo N<br>Environment N]
         end
 
         subgraph "Azure Resources"
@@ -76,10 +76,11 @@ flowchart LR
         C -->|Configures| B
         D -->|Configures| B
 
-        E -->|Has| K[Variables]
-        E -->|Has| L[Secrets]
-        E -->|Has| M[Protection Rules]
-        E -->|Has| N[Approvals]
+        E -->|Has| K[OIDC Identity]
+        E -->|Has| L[Variables]
+        E -->|Has| M[Secrets]
+        E -->|Has| N[Protection Rules]
+        E -->|Has| O[Approvals]
     end
 
     style B fill:#3c3,stroke:#333,stroke-width:2px
