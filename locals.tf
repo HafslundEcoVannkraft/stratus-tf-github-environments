@@ -40,14 +40,7 @@ data "github_user" "environment_users" {
   username = each.key
 }
 
-# Look up existing environments to handle imports
-data "github_repository_environments" "existing" {
-  for_each = toset([
-    for env in local.environments : env.repository
-  ])
 
-  repository = each.key
-}
 
 # =============================================================================
 # KEY VAULT DATA SOURCES FOR SECRETS
@@ -156,7 +149,7 @@ locals {
   # Create a map of deployment targets for role assignment lookup
   deployment_targets_map = {
     for remote in local.github_environment_config :
-    try(remote.metadata.deployment_target, "default") => remote
+    remote.metadata.deployment_target => remote
     if can(remote.metadata.deployment_target)
   }
 
@@ -211,38 +204,12 @@ locals {
     DeploymentDate = timestamp()
   })
 
-  validation_checks = {
-    has_repositories = length(local.repositories) > 0
-    has_environments = length(flatten([for repo in local.repositories : repo.environments])) > 0
-    yaml_is_valid    = can(yamldecode(local.yaml_content))
-  }
-  all_environment_keys = [
+  # Simple validation for outputs (detailed validation is in validation.tf)
+  no_duplicate_environments = length([
     for env in local.environments : "${env.repository}:${env.environment}"
-  ]
-  no_duplicate_environments = length(local.all_environment_keys) == length(toset(local.all_environment_keys))
-  validation_passed         = alltrue(values(local.validation_checks))
-  validation_errors = [
-    !local.validation_checks.has_repositories ? "YAML configuration must contain at least one repository." : null,
-    !local.validation_checks.has_environments ? "At least one environment must be defined in YAML." : null,
-    !local.validation_checks.yaml_is_valid ? "YAML file is not valid or cannot be parsed." : null,
-    !local.no_duplicate_environments ? "Duplicate environment names found (repo:name must be unique)." : null
-  ]
-  validation_errors_filtered = [for e in local.validation_errors : e if e != null]
-  minimum_deployment_requirements = {
-    has_environments       = length(local.environments) > 0
-    has_valid_github_owner = length(var.github_owner) > 0
-    has_github_token       = length(var.github_token) > 0
-    has_azure_config       = length(var.subscription_id) > 0 && length(var.location) > 0
-    has_naming_config      = length(var.code_name) > 0 && length(var.environment) > 0
-  }
-  can_deploy = alltrue([
-    local.validation_passed,
-    local.minimum_deployment_requirements.has_environments,
-    local.minimum_deployment_requirements.has_valid_github_owner,
-    local.minimum_deployment_requirements.has_github_token,
-    local.minimum_deployment_requirements.has_azure_config,
-    local.minimum_deployment_requirements.has_naming_config
-  ])
+    ]) == length(toset([
+      for env in local.environments : "${env.repository}:${env.environment}"
+  ]))
 
   environment_variables = {
     for env in local.environments :
@@ -293,38 +260,20 @@ locals {
   ])
   secrets_map = { for secret in local.environment_secrets : secret.key => secret }
 
-  environments_to_import = [
-    for env in local.environments : "${env.repository}:${env.environment}"
-    if contains(flatten([
-      for repo_name, repo_data in data.github_repository_environments.existing : [
-        for existing_env in repo_data.environments : "${repo_name}:${existing_env.name}"
-      ]
-    ]), "${env.repository}:${env.environment}")
-  ]
-  deployment_targets_valid = alltrue([
-    for env in local.environments :
-    try(env.metadata.deployment_target, null) == null || contains(keys(local.deployment_targets_map), env.metadata.deployment_target)
-  ])
+
+  # Simple validation results for outputs
   validation_results = {
-    remote_state_accessible           = can(data.terraform_remote_state.infrastructure.outputs.github_environments)
-    github_environment_config_present = length(local.github_environment_config) > 0
-    yaml_has_repositories             = length(local.repositories) > 0
-    yaml_repositories_valid           = length(local.repositories) > 0
-    yaml_environments_valid           = length(flatten([for repo in local.repositories : repo.environments])) > 0
-    no_duplicate_environments         = local.no_duplicate_environments
-    deployment_targets_valid          = local.deployment_targets_valid
+    no_duplicate_environments = local.no_duplicate_environments
+    deployment_targets_valid = alltrue([
+      for env in local.environments :
+      try(env.metadata.deployment_target, null) == null || contains(keys(local.deployment_targets_map), env.metadata.deployment_target)
+    ])
   }
-  yaml_github_environment_config = yamldecode(local.yaml_content)
 }
 
 # =============================================================================
 # END OF LOCALS BLOCK - All local variables are now consolidated above
 # =============================================================================
 
-data "github_actions_environment_variables" "env_vars" {
-  for_each = local.environments_map
 
-  name        = each.value.repository
-  environment = each.value.environment
-}
 

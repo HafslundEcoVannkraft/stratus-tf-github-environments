@@ -49,48 +49,10 @@ output "github_environments" {
 # VALIDATION STATUS
 # =============================================================================
 
-output "validation_status" {
-  description = "Comprehensive validation status and any issues found during configuration processing."
-  sensitive   = true
+output "validation_results" {
+  description = "Simple validation results for deployment readiness."
   value = {
-    overall_status = local.validation_passed ? "PASSED" : "FAILED"
-    can_deploy     = local.can_deploy
-
-    validation_results = {
-      yaml_structure = {
-        has_repositories         = local.validation_results.yaml_has_repositories
-        repositories_valid       = local.validation_results.yaml_repositories_valid
-        environments_valid       = local.validation_results.yaml_environments_valid
-        no_duplicates            = local.validation_results.no_duplicate_environments
-        deployment_targets_valid = local.validation_results.deployment_targets_valid
-      }
-      remote_state = {
-        accessible                        = local.validation_results.remote_state_accessible
-        github_environment_config_present = local.validation_results.github_environment_config_present
-      }
-      minimum_requirements = local.minimum_deployment_requirements
-    }
-
-    validation_errors = local.validation_errors
-
-    recommendations = length(local.validation_errors) > 0 ? [
-      "Review validation errors above and fix configuration issues",
-      "Ensure YAML structure follows the documented format",
-      "Verify remote state configuration is correct",
-      "Check that all required variables are provided"
-      ] : [
-      "Configuration is valid and ready for deployment",
-      "All validation checks passed successfully"
-    ]
-
-    help = {
-      documentation_url = "https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/blob/main/README.md"
-      common_fixes = {
-        yaml_issues            = "Check YAML syntax and ensure all required fields are present"
-        remote_state_issues    = "Verify remote state configuration and permissions"
-        duplicate_environments = "Ensure each repository:environment combination is unique"
-        reviewer_issues        = "Check that users have 'username' field and teams have 'name' or 'slug'"
-      }
-    }
+    no_duplicate_environments = local.validation_results.no_duplicate_environments
+    deployment_targets_valid  = local.validation_results.deployment_targets_valid
   }
 }

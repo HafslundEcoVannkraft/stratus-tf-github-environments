@@ -6,70 +6,8 @@
 # -----------------------------------------------------------------------------
 
 # =============================================================================
-# VALIDATION AND CORE RESOURCES
+# CORE RESOURCES
 # =============================================================================
-
-# Comprehensive validation using modern Terraform check blocks
-# These run during plan phase and provide clear error messages
-check "yaml_configuration_valid" {
-  assert {
-    condition     = local.validation_passed
-    error_message = "YAML configuration validation failed:\n${join("\n", local.validation_errors_filtered)}"
-  }
-}
-
-check "minimum_deployment_requirements" {
-  assert {
-    condition     = local.can_deploy
-    error_message = <<-EOT
-      Minimum deployment requirements not met. Please ensure:
-      - YAML configuration is valid
-      - At least one environment is defined
-      - GitHub owner and token are provided
-      - Azure subscription ID and location are set
-      - Code name and environment are specified
-      
-      Current validation errors:
-      ${join("\n", local.validation_errors_filtered)}
-    EOT
-  }
-}
-
-check "remote_state_configuration" {
-  assert {
-    condition     = local.validation_results.remote_state_accessible
-    error_message = <<-EOT
-      Remote state is not accessible. This may indicate:
-      - Incorrect remote state configuration
-      - Missing permissions to access the storage account
-      - The referenced state file does not exist
-      
-      Please verify your remote state configuration:
-      - Resource Group: ${var.remote_state_resource_group_name != null ? var.remote_state_resource_group_name : "${var.code_name}-state-rg-${var.environment}"}
-      - Storage Account: ${var.remote_state_storage_account_name != null ? var.remote_state_storage_account_name : var.state_storage_account_name}
-      - Container: ${var.remote_state_container != null ? var.remote_state_container : "tfstate"}
-      - Key: ${var.remote_state_key != null ? var.remote_state_key : "${var.environment}.tfstate"}
-    EOT
-  }
-}
-
-check "github_environment_config_available" {
-  assert {
-    condition     = local.validation_results.github_environment_config_present || length(local.validation_errors) == 0
-    error_message = <<-EOT
-      GitHub environment configuration not found in remote state.
-      
-      The module expects a 'github_environment_config' output from your infrastructure module.
-      This output should contain environment variables, secrets, and role assignments.
-      
-      If you're using the new remote state convention, ensure your infrastructure module
-      outputs the github_environment_config structure as documented.
-      
-      If you're migrating from legacy role assignments, this warning can be ignored
-      until you update your infrastructure module.
-    EOT
-  }
-}
 
 # Random string for unique resource naming
 resource "random_string" "name_suffix" {

@@ -39,14 +39,15 @@ locals {
       remediation   = "Use alphanumeric characters and hyphens only, avoid Windows reserved names"
     }
 
-    # Container environment mapping validation
-    container_environment_mapping = {
+    # Deployment target validation (optional)
+    deployment_target_validation = {
       valid = alltrue([
         for env in local.environments :
-        env.container_environment != null && length(env.container_environment) > 0
+        try(env.metadata.deployment_target, null) == null ||
+        contains(keys(local.deployment_targets_map), env.metadata.deployment_target)
       ])
-      error_message = "All environments must have valid container_environment mapping"
-      remediation   = "Ensure each environment specifies a container_environment that exists in your remote state"
+      error_message = "Invalid deployment_target in environment metadata"
+      remediation   = "Ensure deployment_target matches a key in your remote state, or omit for default behavior"
     }
 
     # Reviewer configuration validation
@@ -93,9 +94,9 @@ locals {
 
     # Remote state accessibility
     remote_state_access = {
-      valid         = try(local.remote_state_outputs != null, false)
-      error_message = "Cannot access remote state - check configuration and permissions"
-      remediation   = "Verify remote state configuration and ensure proper Azure permissions"
+      valid         = try(local.github_environment_config != null, false)
+      error_message = "Cannot access remote state 'github_environments' output"
+      remediation   = "Verify remote state configuration and ensure infrastructure module outputs 'github_environments'"
     }
   }
 

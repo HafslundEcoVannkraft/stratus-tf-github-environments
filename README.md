@@ -53,6 +53,11 @@
   - [Azure Resources Created](#azure-resources-created)
   - [GitHub Action Integration](#github-action-integration)
     - [Example Workflow for Azure Deployment](#example-workflow-for-azure-deployment)
+  - [Validation and Error Handling](#validation-and-error-handling)
+    - [Validation Framework](#validation-framework)
+    - [Common Validation Errors](#common-validation-errors)
+    - [Validation Outputs](#validation-outputs)
+    - [Best Practices for Validation](#best-practices-for-validation)
   - [Common Issues and Troubleshooting](#common-issues-and-troubleshooting)
   - [🌟 **Welcome Contributors!**](#-welcome-contributors)
     - [🎯 **Quick Ways to Contribute**](#-quick-ways-to-contribute)
@@ -641,6 +646,76 @@ jobs:
         run: |
           func azure functionapp publish my-function-app
 ```
+
+## Validation and Error Handling
+
+The module includes comprehensive validation to catch configuration errors early and provide clear guidance for fixes.
+
+### Validation Framework
+
+The module validates your configuration at multiple levels:
+
+#### **1. YAML Structure Validation**
+- Validates YAML syntax and required fields
+- Ensures repository and environment names follow GitHub conventions
+- Checks for duplicate environment configurations
+
+#### **2. Deployment Target Validation**
+- Validates that `deployment_target` values exist in your remote state
+- Optional validation - environments without deployment targets are allowed
+- Provides clear error messages when targets are missing
+
+#### **3. GitHub API Validation**
+- Validates GitHub token permissions and scopes
+- Checks repository accessibility
+- Validates user and team references in reviewers
+
+#### **4. Azure Prerequisites Validation**
+- Validates Azure subscription ID format
+- Checks remote state accessibility
+- Validates Azure resource naming conventions
+
+### Common Validation Errors
+
+#### **Invalid deployment_target**
+```
+Error: Invalid deployment_target in environment metadata
+```
+**Fix**: Ensure the deployment_target exists in your remote state outputs, or omit it for generic environments.
+
+#### **Remote state access error**
+```
+Error: Cannot access remote state 'github_environments' output
+```
+**Fix**: Verify remote state configuration and ensure your infrastructure module outputs 'github_environments'.
+
+#### **Duplicate environments**
+```
+Error: Duplicate repository:environment combinations detected
+```
+**Fix**: Ensure each repository:environment combination is unique across your configuration.
+
+### Validation Outputs
+
+Check validation status using Terraform outputs:
+
+```bash
+# Check validation results
+terraform output validation_results
+
+# Example output:
+# {
+#   "deployment_targets_valid" = true
+#   "no_duplicate_environments" = true
+# }
+```
+
+### Best Practices for Validation
+
+1. **Test Configuration Changes**: Always run `terraform plan` to validate changes before applying
+2. **Use Descriptive Names**: Choose clear, consistent naming for repositories and environments
+3. **Validate YAML Syntax**: Use a YAML validator or editor with syntax highlighting
+4. **Check Remote State**: Ensure your infrastructure outputs are up-to-date before running this module
 
 ## Common Issues and Troubleshooting
 

@@ -5,16 +5,7 @@
 # Enhanced with retry logic and better error handling.
 # -----------------------------------------------------------------------------
 
-# =============================================================================
-# IMPORT HANDLING
-# =============================================================================
 
-# Import block for existing GitHub environments
-import {
-  for_each = toset(keys(local.environments_map))
-  to       = github_repository_environment.environment[each.key]
-  id       = each.key
-}
 
 # =============================================================================
 # GITHUB ENVIRONMENTS WITH ENHANCED ERROR HANDLING
