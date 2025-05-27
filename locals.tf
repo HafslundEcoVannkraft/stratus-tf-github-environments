@@ -219,9 +219,11 @@ locals {
         for k, v in try(env.metadata.deployment_target, null) != null ? try(local.deployment_targets_map[env.metadata.deployment_target].variables, {}) : {} :
         k => v if v != null
       },
-      # Auto-generated Azure identity variables (always provided)
+      # Always provided varables for GitHub OIDC authentication
       {
-        AZURE_CLIENT_ID = module.github_environment_identity[env.key].client_id
+        AZURE_CLIENT_ID       = module.github_environment_identity[env.key].client_id
+        AZURE_TENANT_ID       = data.azurerm_client_config.current.tenant_id
+        AZURE_SUBSCRIPTION_ID = data.azurerm_client_config.current.subscription_id
       },
       # Variables from YAML (highest precedence) - filter out null values
       {
