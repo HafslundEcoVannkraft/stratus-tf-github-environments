@@ -1,6 +1,6 @@
 # AI Context for stratus-tf-github-environments
 
-> **🚧 WORK IN PROGRESS** 🚧  
+> **🚧 WORK IN PROGRESS** 🚧
 > This project is currently under active development. Features, APIs, and documentation may change without notice.
 
 This document provides essential context for AI assistants working on the `stratus-tf-github-environments` project. It helps maintain consistency across AI sessions and ensures new AI interactions understand the project's purpose, architecture, and constraints.
@@ -103,11 +103,6 @@ stratus-tf-github-environments/
 - **Community Friendly**: Welcoming to contributors
 
 ## 🔍 Key Constraints & Limitations
-
-### GitHub API Limitations
-- **One deployment pattern per environment**: Branch OR tag policies, not both
-- **Protected branches vs tag policies**: Mutually exclusive
-- **API inconsistencies**: 45-second wait times to handle GitHub API issues
 
 ### Stratus-Specific Constraints
 - **Corporate network requirements**: Private endpoints for storage accounts
@@ -270,4 +265,4 @@ role_assignments = {
 
 ---
 
-> **For AI Assistants**: This project is production-ready and used by multiple teams. The module is now generic for any Azure infrastructure while maintaining Stratus workflow patterns. Changes should be conservative, well-documented, and maintain backward compatibility. When in doubt, ask for clarification about Stratus-specific requirements or corporate constraints. 
+> **For AI Assistants**: This project is production-ready and used by multiple teams. The module is now generic for any Azure infrastructure while maintaining Stratus workflow patterns. Changes should be conservative, well-documented, and maintain backward compatibility. When in doubt, ask for clarification about Stratus-specific requirements or corporate constraints.
