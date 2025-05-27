@@ -9,17 +9,104 @@
 [![Good First Issues](https://img.shields.io/github/issues/HafslundEcoVannkraft/stratus-tf-github-environments/good%20first%20issue?color=7057ff&logo=github)](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 [![Work in Progress](https://img.shields.io/badge/Status-Work%20in%20Progress-yellow?style=flat&logo=github)](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments)
 
-
-
 > **Note:** This module is specifically tailored for developer teams building on the Stratus Azure Landing Zone architecture. It is optimized for the IaC Repositories created for each new system or team starting their journey in Stratus. Some input variables and design choices are opinionated for this workflow. **This module may not be the optimal choice for other use cases or non-Stratus environments.**
+
+## Conceptual Overview
+
+### Where GitHub Environment Vending Fits in the Full Deployment Cycle
+
+```mermaid
+flowchart TD
+    subgraph "Phase 1: IaC Runtime Env"
+        A[Team IaC Repo] -->|Deploy Terraform| B[Azure Infrastructure]
+        B --> C[Azure Resources<br>Container Apps, AKS,<br>Storage, etc.]
+        B --> D[Terraform State<br>with GitHub Environment Outputs]
+    end
+
+    subgraph "Phase 2: GitHub Environment Vending"
+        E[GitHub Environment Vending Workflow] -->|Read| F[YAML Config<br>from IaC Repo]
+        E -->|Read| D
+        E -->|Create/Configure| G[GitHub Environments<br>in Application Repos]
+        G -->|Setup| H[Managed Identities]
+        G -->|Setup| I[OIDC Federation]
+        G -->|Configure| J[Role Assignments]
+        G -->|Add| K[Variables & Secrets]
+    end
+
+    subgraph "Phase 3: Application Deployment"
+        L[App Source Code Repos] -->|Use Configured<br>Environments| M[Build & Push]
+        M -->|Deploy via OIDC| C
+    end
+
+    D -.->|Powers| E
+    G -.->|Enables| L
+    style E fill:#3c3,stroke:#333,stroke-width:2px
+```
+
+### Conceptual Design: The Power of YAML + Remote Terraform State
+
+```mermaid
+flowchart LR
+    subgraph "Environment Vending"
+        A[IaC Repository] -->|Run| B[GitHub Environment<br>Vending Workflow]
+
+        subgraph "Inputs"
+            C[YAML Configuration<br>Repository Names<br>Environment Settings]
+            D[Remote State Output<br>Deployment Target Details<br>Role Assignments<br>Environment Variables]
+        end
+
+        subgraph "Result: New Environments"
+            E[GitHub<br>Environment 1]
+            F[GitHub<br>Environment 2]
+            G[GitHub<br>Environment N]
+        end
+
+        subgraph "Azure Resources"
+            H[Managed Identity]
+            I[OIDC Federation]
+            J[Role Assignments]
+        end
+
+        B -->|Creates| E
+        B -->|Creates| F
+        B -->|Creates| G
+        B -->|Creates| H
+        B -->|Creates| I
+        B -->|Creates| J
+        C -->|Configures| B
+        D -->|Configures| B
+
+        E -->|Has| K[Variables]
+        E -->|Has| L[Secrets]
+        E -->|Has| M[Protection Rules]
+        E -->|Has| N[Approvals]
+    end
+
+    style B fill:#3c3,stroke:#333,stroke-width:2px
+```
+
+The module creates a **secure bridge** between GitHub Actions and Azure infrastructure by combining:
+
+1. **YAML Configuration** (what you specify) - Defines GitHub-specific settings like approvals, variables, and which repositories need environments
+2. **Terraform Remote State** (what comes from infrastructure) - Contains the technical details of deployment targets, roles, and permissions
+
+This combination enables powerful automation:
+
+- Infrastructure teams define standard role assignments and permissions once
+- Application teams use simple YAML to connect their repositories without duplicating complex settings
+- New applications can be onboarded to existing infrastructure in minutes
 
 ---
 
 ## Table of Contents
 
 - [GitHub Environment Vending for Azure Infrastructure](#github-environment-vending-for-azure-infrastructure)
+  - [Conceptual Overview](#conceptual-overview)
+    - [Where GitHub Environment Vending Fits in the Full Deployment Cycle](#where-github-environment-vending-fits-in-the-full-deployment-cycle)
+    - [Conceptual Design: The Power of YAML + Remote Terraform State](#conceptual-design-the-power-of-yaml--remote-terraform-state)
   - [Table of Contents](#table-of-contents)
   - [What This Module Does](#what-this-module-does)
+    - [**Generic Infrastructure Support**](#generic-infrastructure-support)
   - [Quick Setup Guide](#quick-setup-guide)
     - [1. Copy Required Files](#1-copy-required-files)
     - [2. Customize the Environment Configuration](#2-customize-the-environment-configuration)
@@ -55,7 +142,14 @@
     - [Example Workflow for Azure Deployment](#example-workflow-for-azure-deployment)
   - [Validation and Error Handling](#validation-and-error-handling)
     - [Validation Framework](#validation-framework)
+      - [**1. YAML Structure Validation**](#1-yaml-structure-validation)
+      - [**2. Deployment Target Validation**](#2-deployment-target-validation)
+      - [**3. GitHub API Validation**](#3-github-api-validation)
+      - [**4. Azure Prerequisites Validation**](#4-azure-prerequisites-validation)
     - [Common Validation Errors](#common-validation-errors)
+      - [**Invalid deployment\_target**](#invalid-deployment_target)
+      - [**Remote state access error**](#remote-state-access-error)
+      - [**Duplicate environments**](#duplicate-environments)
     - [Validation Outputs](#validation-outputs)
     - [Best Practices for Validation](#best-practices-for-validation)
   - [Common Issues and Troubleshooting](#common-issues-and-troubleshooting)
@@ -80,7 +174,7 @@ This Terraform module creates a **secure bridge** between GitHub Actions and Azu
 While originally designed for Azure Container Apps, this module now supports **any Azure infrastructure pattern**:
 
 - **Container Apps** - Containerized applications with auto-scaling
-- **Azure Kubernetes Service (AKS)** - Kubernetes clusters and workloads  
+- **Azure Kubernetes Service (AKS)** - Kubernetes clusters and workloads
 - **Virtual Machines** - Traditional VM-based applications
 - **Azure Functions** - Serverless compute
 - **Static Web Apps** - Frontend applications
@@ -321,6 +415,7 @@ Stratus Landing Zone: "codename-dev" (Azure Subscription)
 The module uses a **dynamic, convention-based approach** for role assignments that automatically maps GitHub environment suffixes to role assignment types:
 
 **How it works:**
+
 - Environment names ending with `-{suffix}` automatically get `role_assignments.{suffix}`
 - Examples: `prod-ci` gets `role_assignments.ci`, `dev-deploy` gets `role_assignments.deploy`
 - `global` role assignments are always applied regardless of suffix
@@ -328,15 +423,18 @@ The module uses a **dynamic, convention-based approach** for role assignments th
 **Supported Conventions:**
 
 **Standard CI/CD:**
+
 - `my-app-prod-ci` → gets `role_assignments.ci` (read-only permissions)
 - `my-app-prod-cd` → gets `role_assignments.cd` (deployment permissions)
 
 **Custom Workflows:**
+
 - `my-app-prod-validate` → gets `role_assignments.validate`
 - `my-app-prod-deploy` → gets `role_assignments.deploy`
 - `my-app-prod-test` → gets `role_assignments.test`
 
 **Any Convention:**
+
 - `my-app-prod-backup` → gets `role_assignments.backup`
 - `my-app-prod-migrate` → gets `role_assignments.migrate`
 
@@ -357,16 +455,17 @@ repositories:
     environments:
       - name: prod-cd
         metadata:
-          deployment_target: web-apps  # Shared target
-  
-  - repo: marketing-site  
+          deployment_target: web-apps # Shared target
+
+  - repo: marketing-site
     environments:
       - name: prod-cd
         metadata:
-          deployment_target: web-apps  # Same target
+          deployment_target: web-apps # Same target
 ```
 
 **Benefits:**
+
 - ✅ **Resource Efficiency**: Shared Azure infrastructure (CDN, storage, networking)
 - ✅ **Consistent Configuration**: All apps get identical Azure settings automatically
 - ✅ **Simplified Management**: Infrastructure defined once, used by many applications
@@ -423,6 +522,7 @@ This module is **not a standalone solution**. It is designed to be used as part 
    Run Terraform in your IaC repo to create your Azure infrastructure (Container Apps, AKS, VMs, etc.). We recommend using the [Stratus Terraform Examples](https://github.com/HafslundEcoVannkraft/stratus-tf-examples) for tested, production-ready infrastructure patterns.
 
 2. **Configure GitHub Environments:**
+
    - Edit `github-environments.yaml` in the IaC repo to describe which app repos/environments to configure.
    - Run the provided workflow (via GitHub CLI) with the required inputs (`github_token`, `tfvars_file`).
 
@@ -446,21 +546,21 @@ repositories:
 
 ### Environment Options
 
-| Property                                         | Type    | Description                                           | Default   | Required |
-| ------------------------------------------------ | ------- | ----------------------------------------------------- | --------- | -------- |
-| `name`                                           | string  | Name of the GitHub deployment environment             | -         | Yes      |
-| `metadata.deployment_target`                     | string  | Maps to deployment target key in remote state        | -         | No       |
-| `wait_timer`                                     | integer | Wait time (minutes) before allowing deployments       | 0         | No       |
-| `prevent_self_review`                            | boolean | Prevents people from approving their own deployments  | false     | No       |
-| `prevent_destroy`                                | boolean | Prevents accidental destruction of the environment    | false     | No       |
-| `reviewers`                                      | object  | Users and teams who must approve deployments          | null      | No       |
-| `deployment_branch_policy`                       | object  | Branch restriction rules                              | null      | No       |
-| `deployment_branch_policy.protected_branches`    | boolean | Only allow deployments from protected branches       | true      | No       |
-| `deployment_branch_policy.custom_branch_policies` | boolean | Allow deployments from specific branches or tags     | false     | No       |
-| `deployment_branch_policy.branch_pattern`        | array   | Branch patterns for custom branch policy             | []        | No       |
-| `deployment_branch_policy.tag_pattern`           | array   | Tag-based deployment rules                            | []        | No       |
-| `variables`                                      | object  | Environment variables to create                       | {}        | No       |
-| `secrets`                                        | object  | Secrets to create from Azure Key Vault               | {}        | No       |
+| Property                                          | Type    | Description                                          | Default | Required |
+| ------------------------------------------------- | ------- | ---------------------------------------------------- | ------- | -------- |
+| `name`                                            | string  | Name of the GitHub deployment environment            | -       | Yes      |
+| `metadata.deployment_target`                      | string  | Maps to deployment target key in remote state        | -       | No       |
+| `wait_timer`                                      | integer | Wait time (minutes) before allowing deployments      | 0       | No       |
+| `prevent_self_review`                             | boolean | Prevents people from approving their own deployments | false   | No       |
+| `prevent_destroy`                                 | boolean | Prevents accidental destruction of the environment   | false   | No       |
+| `reviewers`                                       | object  | Users and teams who must approve deployments         | null    | No       |
+| `deployment_branch_policy`                        | object  | Branch restriction rules                             | null    | No       |
+| `deployment_branch_policy.protected_branches`     | boolean | Only allow deployments from protected branches       | true    | No       |
+| `deployment_branch_policy.custom_branch_policies` | boolean | Allow deployments from specific branches or tags     | false   | No       |
+| `deployment_branch_policy.branch_pattern`         | array   | Branch patterns for custom branch policy             | []      | No       |
+| `deployment_branch_policy.tag_pattern`            | array   | Tag-based deployment rules                           | []      | No       |
+| `variables`                                       | object  | Environment variables to create                      | {}      | No       |
+| `secrets`                                         | object  | Secrets to create from Azure Key Vault               | {}      | No       |
 
 ### Secrets Configuration
 
@@ -472,12 +572,12 @@ secrets:
   DATABASE_PASSWORD:
     key_vault: "my-key-vault-name"
     secret_ref: "database-password"
-  
+
   # Specific version
   API_KEY:
     key_vault: "shared-vault"
     secret_ref: "api-key/a1b2c3d4e5f6"
-  
+
   # Version with semantic naming
   TLS_CERTIFICATE:
     key_vault: "security-vault"
@@ -485,6 +585,7 @@ secrets:
 ```
 
 Each secret requires:
+
 - **`key_vault`**: Name of the Azure Key Vault containing the secret
 - **`secret_ref`**: Name of the secret within the Key Vault. Supports both versionless (latest) and versioned references:
   - `"secret-name"` - Uses the latest version
@@ -561,10 +662,11 @@ reviewers:
 
 ### Branch Policies
 
-GitHub environments can restrict which branches can deploy to them. 
+GitHub environments can restrict which branches can deploy to them.
 
 **Default Behavior:**
 When no `deployment_branch_policy` is specified in your YAML configuration, the module applies secure defaults:
+
 - `protected_branches: true` - Only protected branches can deploy
 - `custom_branch_policies: false` - No custom branch patterns allowed
 
@@ -588,11 +690,13 @@ The module automatically provides essential Azure infrastructure variables for a
 For each environment, the following Azure resources are created:
 
 1. **User-Assigned Managed Identity**:
+
    - Located in a shared resource group
    - Named `{codename}-id-github-{repo}-{environment}`
    - Used by GitHub Actions workflows for secure access to Azure
 
 2. **Federated Credential**:
+
    - Links GitHub Actions to the managed identity
    - Subject format: `repo:{owner}/{repo}:environment:{environment}`
    - Enables passwordless authentication from GitHub to Azure
@@ -668,21 +772,25 @@ The module includes comprehensive validation to catch configuration errors early
 The module validates your configuration at multiple levels:
 
 #### **1. YAML Structure Validation**
+
 - Validates YAML syntax and required fields
 - Ensures repository and environment names follow GitHub conventions
 - Checks for duplicate environment configurations
 
 #### **2. Deployment Target Validation**
+
 - Validates that `deployment_target` values exist in your remote state
 - Optional validation - environments without deployment targets are allowed
 - Provides clear error messages when targets are missing
 
 #### **3. GitHub API Validation**
+
 - Validates GitHub token permissions and scopes
 - Checks repository accessibility
 - Validates user and team references in reviewers
 
 #### **4. Azure Prerequisites Validation**
+
 - Validates Azure subscription ID format
 - Checks remote state accessibility
 - Validates Azure resource naming conventions
@@ -690,21 +798,27 @@ The module validates your configuration at multiple levels:
 ### Common Validation Errors
 
 #### **Invalid deployment_target**
+
 ```
 Error: Invalid deployment_target in environment metadata
 ```
+
 **Fix**: Ensure the deployment_target exists in your remote state outputs, or omit it for generic environments.
 
 #### **Remote state access error**
+
 ```
 Error: Cannot access remote state 'github_environments' output
 ```
+
 **Fix**: Verify remote state configuration and ensure your infrastructure module outputs 'github_environments'.
 
 #### **Duplicate environments**
+
 ```
 Error: Duplicate repository:environment combinations detected
 ```
+
 **Fix**: Ensure each repository:environment combination is unique across your configuration.
 
 ### Validation Outputs
@@ -734,6 +848,7 @@ terraform output validation_results
 For comprehensive troubleshooting, see our [Troubleshooting Guide](./TROUBLESHOOTING.md).
 
 **Most Common Issues:**
+
 - **Authentication**: Use GitHub CLI authentication instead of Personal Access Tokens
 - **Permissions**: Ensure proper Azure subscription access
 - **Configuration**: Validate YAML syntax and environment names
