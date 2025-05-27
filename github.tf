@@ -48,7 +48,7 @@ resource "github_repository_environment" "environment" {
 
   # Add deployment branch policy if configured
   deployment_branch_policy {
-    protected_branches     = try(each.value.branch_policy.protected_branches, false)
+    protected_branches     = try(each.value.branch_policy.protected_branches, true)
     custom_branch_policies = try(each.value.branch_policy.custom_branch_policies, false)
   }
 

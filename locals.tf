@@ -103,7 +103,7 @@ locals {
           teams = []
         })
         branch_policy = try(env.deployment_branch_policy, {
-          protected_branches     = false
+          protected_branches     = true
           custom_branch_policies = false
           branch_pattern         = []
           tag_pattern            = []

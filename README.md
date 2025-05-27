@@ -455,7 +455,7 @@ repositories:
 | `prevent_destroy`                                | boolean | Prevents accidental destruction of the environment    | false     | No       |
 | `reviewers`                                      | object  | Users and teams who must approve deployments          | null      | No       |
 | `deployment_branch_policy`                       | object  | Branch restriction rules                              | null      | No       |
-| `deployment_branch_policy.protected_branches`    | boolean | Only allow deployments from protected branches       | false     | No       |
+| `deployment_branch_policy.protected_branches`    | boolean | Only allow deployments from protected branches       | true      | No       |
 | `deployment_branch_policy.custom_branch_policies` | boolean | Allow deployments from specific branches or tags     | false     | No       |
 | `deployment_branch_policy.branch_pattern`        | array   | Branch patterns for custom branch policy             | []        | No       |
 | `deployment_branch_policy.tag_pattern`           | array   | Tag-based deployment rules                            | []        | No       |
@@ -561,7 +561,19 @@ reviewers:
 
 ### Branch Policies
 
-GitHub environments can restrict which branches can deploy to them. See the [complete example](./examples/complete.yaml) for detailed branch policy configurations.
+GitHub environments can restrict which branches can deploy to them. 
+
+**Default Behavior:**
+When no `deployment_branch_policy` is specified in your YAML configuration, the module applies secure defaults:
+- `protected_branches: true` - Only protected branches can deploy
+- `custom_branch_policies: false` - No custom branch patterns allowed
+
+This ensures that environments are secure by default, requiring branches to be protected in GitHub before they can trigger deployments.
+
+**Custom Configuration:**
+You can override these defaults by specifying a `deployment_branch_policy` in your environment configuration. See the [complete example](./examples/complete.yaml) for detailed branch policy configurations.
+
+**Important:** GitHub API requires that `protected_branches` and `custom_branch_policies` cannot have the same value. The module handles this automatically with the secure defaults above.
 
 ### Environment Variables and Secrets
 
