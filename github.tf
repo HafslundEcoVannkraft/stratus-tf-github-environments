@@ -210,7 +210,7 @@ resource "github_actions_environment_variable" "environment_variables" {
 
     # Add precondition to validate variable value length
     precondition {
-      condition     = length(each.value.value) <= 1000
+      condition     = each.value.value != null && length(each.value.value) <= 1000
       error_message = "Variable value for '${each.value.name}' exceeds 1000 character limit"
     }
   }

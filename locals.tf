@@ -109,7 +109,7 @@ locals {
           tag_pattern            = []
         })
         variables = try(env.variables, {})
-        secrets   = try(env.secrets, [])
+        secrets   = try(env.secrets, {})
       }
     ]
   ])
@@ -214,49 +214,56 @@ locals {
   environment_variables = {
     for env in local.environments :
     env.key => merge(
-      # Variables from remote state (if deployment target is specified)
-      try(env.metadata.deployment_target, null) != null ? try(local.deployment_targets_map[env.metadata.deployment_target].variables, {}) : {},
+      # Variables from remote state (if deployment target is specified) - filter out null values
+      {
+        for k, v in try(env.metadata.deployment_target, null) != null ? try(local.deployment_targets_map[env.metadata.deployment_target].variables, {}) : {} :
+        k => v if v != null
+      },
       # Auto-generated Azure identity variables (always provided)
       {
         AZURE_CLIENT_ID = module.github_environment_identity[env.key].client_id
       },
-      # Variables from YAML (highest precedence)
-      try(env.variables, {})
+      # Variables from YAML (highest precedence) - filter out null values
+      {
+        for k, v in try(env.variables, {}) :
+        k => v if v != null
+      }
     )
   }
 
   environment_secrets = flatten([
-    for env in local.environments : [
+    for env in local.environments : concat(
       # Secrets from remote state (deployment target level, if specified)
-      for secret_name, secret_config in try(env.metadata.deployment_target, null) != null ? try(local.deployment_targets_map[env.metadata.deployment_target].secrets, {}) : {} : (
-        can(secret_config.key_vault) && can(secret_config.secret_ref)
-        ? {
-          key         = "${env.repository}:${env.environment}-${secret_name}"
-          full_key    = "${env.key}-${secret_name}"
-          repository  = env.repository
-          environment = env.environment
-          name        = secret_name
-          value       = data.azurerm_key_vault_secret.remote_state_secrets["${secret_config.key_vault}:${secret_config.secret_ref}"].value
-        }
-        : (throw("All secrets must be a map with key_vault and secret_ref. Secret '${secret_name}' in environment '${env.environment}' is invalid."))
-      )
-    ]
-    ] + [
-    # Secrets from YAML (environment level)
-    for env in local.environments : [
-      for secret_name, secret_config in try(env.secrets, {}) : (
-        can(secret_config.key_vault) && can(secret_config.secret_ref)
-        ? {
-          key         = "${env.repository}:${env.environment}-${secret_name}"
-          full_key    = "${env.key}-${secret_name}"
-          repository  = env.repository
-          environment = env.environment
-          name        = secret_name
-          value       = data.azurerm_key_vault_secret.remote_state_secrets["${secret_config.key_vault}:${secret_config.secret_ref}"].value
-        }
-        : (throw("All secrets must be a map with key_vault and secret_ref. Secret '${secret_name}' in environment '${env.environment}' is invalid."))
-      )
-    ]
+      [
+        for secret_name, secret_config in try(env.metadata.deployment_target, null) != null ? try(local.deployment_targets_map[env.metadata.deployment_target].secrets, {}) : {} : (
+          can(secret_config.key_vault) && can(secret_config.secret_ref)
+          ? {
+            key         = "${env.repository}:${env.environment}-${secret_name}"
+            full_key    = "${env.key}-${secret_name}"
+            repository  = env.repository
+            environment = env.environment
+            name        = secret_name
+            value       = length(local.unique_kv_secrets) > 0 ? data.azurerm_key_vault_secret.remote_state_secrets["${secret_config.key_vault}:${secret_config.secret_ref}"].value : ""
+          }
+          : (throw("All secrets must be a map with key_vault and secret_ref. Secret '${secret_name}' in environment '${env.environment}' is invalid."))
+        )
+      ],
+      # Secrets from YAML (environment level)
+      [
+        for secret_name, secret_config in try(env.secrets, {}) : (
+          can(secret_config.key_vault) && can(secret_config.secret_ref)
+          ? {
+            key         = "${env.repository}:${env.environment}-${secret_name}"
+            full_key    = "${env.key}-${secret_name}"
+            repository  = env.repository
+            environment = env.environment
+            name        = secret_name
+            value       = length(local.unique_kv_secrets) > 0 ? data.azurerm_key_vault_secret.remote_state_secrets["${secret_config.key_vault}:${secret_config.secret_ref}"].value : ""
+          }
+          : (throw("All secrets must be a map with key_vault and secret_ref. Secret '${secret_name}' in environment '${env.environment}' is invalid."))
+        )
+      ]
+    )
   ])
   secrets_map = { for secret in local.environment_secrets : secret.key => secret }
 
