@@ -1,19 +1,20 @@
-# AI Context for stratus-tf-aca-gh-vending
+# AI Context for stratus-tf-github-environments
 
 > **🚧 WORK IN PROGRESS** 🚧  
 > This project is currently under active development. Features, APIs, and documentation may change without notice.
 
-This document provides essential context for AI assistants working on the `stratus-tf-aca-gh-vending` project. It helps maintain consistency across AI sessions and ensures new AI interactions understand the project's purpose, architecture, and constraints.
+This document provides essential context for AI assistants working on the `stratus-tf-github-environments` project. It helps maintain consistency across AI sessions and ensures new AI interactions understand the project's purpose, architecture, and constraints.
 
 ## 🎯 Project Overview
 
 ### Purpose
-This Terraform module automates the creation of GitHub deployment environments for Azure Container Apps within the **Stratus Corp Azure Landing Zone** architecture. It establishes secure OIDC federation between GitHub Actions and Azure, eliminating the need for static credentials.
+This Terraform module automates the creation of GitHub deployment environments for Azure infrastructure within the **Stratus Corp Azure Landing Zone** architecture. It establishes secure OIDC federation between GitHub Actions and Azure, eliminating the need for static credentials.
 
 ### Key Value Proposition
+- **Generic Infrastructure Support**: Works with any Azure infrastructure (Container Apps, AKS, VMs, Functions, etc.)
 - **Secure Authentication**: OIDC federation replaces static secrets
 - **Centralized Management**: IaC repository controls all environment creation
-- **Flexible Deployment**: Multiple GitHub environments can target the same Azure resources
+- **Dynamic Role Assignment**: Convention-based role mapping for infinite flexibility
 - **Enterprise Ready**: Designed for corporate environments with strict security requirements
 
 ## 🏗️ Architecture Context
@@ -23,17 +24,24 @@ This Terraform module automates the creation of GitHub deployment environments f
 1. **Stratus Landing Zone** (Azure Subscription Level)
    - Complete Azure subscription with shared resources
    - Named: `{code_name}-{environment}` (e.g., "myapp-dev")
-   - Contains: Multiple Container App Environments, ACR, DNS zones
+   - Contains: Multiple deployment targets, shared networking, DNS, monitoring
 
-2. **Azure Container App Environments** (Application Level)
+2. **Deployment Targets** (Application Level)
    - Logical separation within a subscription
-   - Examples: `ace1`, `ace2`, `background-jobs`
+   - Examples: `web-apps`, `api-services`, `data-processing`, `container-apps`, `kubernetes`
    - Independent scaling and resource allocation
+   - Technology agnostic (any Azure infrastructure)
 
 3. **GitHub Deployment Environments** (Workflow Level)
    - Control deployment workflows and security policies
-   - Examples: `ace1-dev-plan`, `ace1-dev-apply`
+   - Examples: `web-dev-ci`, `api-prod-cd`, `data-validate`
    - Each gets unique managed identity and federated credentials
+
+### Dynamic Role Assignment Convention
+- Environment names ending with `-{suffix}` automatically get `role_assignments.{suffix}`
+- Examples: `prod-ci` → `role_assignments.ci`, `dev-deploy` → `role_assignments.deploy`
+- `global` role assignments always applied
+- Supports any custom convention (ci/cd, validate/deploy, test/backup, etc.)
 
 ### Execution Model
 - **NOT a standalone module** - part of larger Stratus workflow
@@ -45,17 +53,17 @@ This Terraform module automates the creation of GitHub deployment environments f
 
 ### Core Components
 - **Terraform Module**: Creates Azure managed identities and GitHub environments
-- **GitHub Workflow**: `github-environment-aca.yml` for execution
+- **GitHub Workflow**: `github-environment-vending.yml` for execution
 - **YAML Configuration**: `github-environments.yaml` for environment definitions
 - **Remote State Integration**: Reads from upstream infrastructure outputs
 
 ### Key Files Structure
 ```
-stratus-tf-aca-gh-vending/
+stratus-tf-github-environments/
 ├── .github/
 │   ├── dependabot.yml           # Dependency management configuration
 │   └── workflows/               # CI/CD workflows
-│       ├── github-environment-aca.yml  # Main vending workflow
+│       ├── github-environment-vending.yml  # Main vending workflow
 │       └── integration-test.yml # End-to-end testing
 ├── examples/                    # Configuration examples
 ├── tests/                       # Testing infrastructure
@@ -70,9 +78,15 @@ stratus-tf-aca-gh-vending/
 
 ## 🎨 Design Principles
 
+### Generic Infrastructure Support
+- **Technology Agnostic**: Supports any Azure infrastructure pattern
+- **Convention-Based**: Dynamic role assignment based on naming patterns
+- **Flexible Mapping**: Deployment targets can be any infrastructure type
+- **Future-Proof**: Easy to extend for new Azure services
+
 ### Security First
 - **OIDC Federation**: No static credentials stored
-- **Least Privilege**: Role assignments based on environment type
+- **Least Privilege**: Role assignments based on environment type and naming convention
 - **Conservative Auto-merge**: Only security updates auto-merge
 - **Environment Isolation**: Each environment gets unique identity
 
@@ -109,22 +123,25 @@ stratus-tf-aca-gh-vending/
 ## 📋 Common Patterns & Conventions
 
 ### Naming Conventions
-- **Resources**: `{code_name}-{resource_type}-{environment}-{purpose}-{suffix}`
-- **Environments**: `{container_environment}-{azure_environment}-{operation}`
-- **Examples**: `myapp-rg-dev-github-identities-a1b2`, `ace1-dev-apply`
+- **Resources**: `{code_name}-{resource_type}-{environment}-{purpose/identifier}-{suffix}`
+- **Environments**: `{deployment_target}-{azure_environment}-{operation}`
+- **Examples**: `myapp-rg-dev-github-identities-a1b2`, `web-dev-ci`, `api-prod-cd`
 
 ### Configuration Patterns
 - **Minimal setup**: Single environment, basic configuration
 - **Multi-environment**: Separate files per Stratus Landing Zone
-- **Multi-ACE**: Different Container App Environments in same subscription
-- **Complex**: Multiple Stratus LZ + multiple ACE combinations
+- **Multi-target**: Different deployment targets in same subscription
+- **Complex**: Multiple Stratus LZ + multiple deployment targets
 
-### Role Assignment Patterns
+### Dynamic Role Assignment Patterns
 ```hcl
 role_assignments = {
-  global = [...]  # All environments
-  plan = [...]    # Read-only environments (ending with '-plan')
-  apply = [...]   # Deployment environments (not ending with '-plan')
+  global = [...]     # Always applied
+  ci = [...]         # Applied to environments ending with '-ci'
+  cd = [...]         # Applied to environments ending with '-cd'
+  validate = [...]   # Applied to environments ending with '-validate'
+  deploy = [...]     # Applied to environments ending with '-deploy'
+  # Any custom suffix supported
 }
 ```
 
@@ -170,18 +187,21 @@ role_assignments = {
    - Always consider the three-layer environment model
    - Remember this is part of larger Stratus workflow
    - Consider GitHub API limitations in solutions
+   - Focus on generic infrastructure support, not just Container Apps
 
 2. **Code Changes**
    - Maintain input validation patterns
    - Follow naming conventions
    - Update documentation for any changes
    - Consider impact on existing configurations
+   - Ensure dynamic role assignment flexibility
 
 3. **Documentation Updates**
    - Keep README.md as primary reference
    - Update specialized docs for specific changes
    - Maintain example configurations
    - Update troubleshooting for new issues
+   - Emphasize generic nature while maintaining Stratus context
 
 4. **Testing Considerations**
    - Local validation must pass
@@ -194,7 +214,7 @@ role_assignments = {
 - **Target Audience**: DevOps engineers in corporate environment
 - **Skill Level**: Intermediate to advanced Terraform and Azure knowledge
 - **Environment**: Corporate network with security restrictions
-- **Use Case**: Secure CI/CD for containerized applications
+- **Use Case**: Secure CI/CD for any Azure infrastructure
 - **Scale**: Enterprise-level with multiple teams and environments
 
 ## 🔗 Related Resources
@@ -210,6 +230,7 @@ role_assignments = {
 - [Stratus Terraform Examples](https://github.com/HafslundEcoVannkraft/stratus-tf-examples)
 - [GitHub OIDC Documentation](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect)
 - [Azure Container Apps Documentation](https://docs.microsoft.com/en-us/azure/container-apps/)
+- [Azure Kubernetes Service Documentation](https://docs.microsoft.com/en-us/azure/aks/)
 - [Terraform Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
 
 ## 🚨 Important Notes for AI
@@ -219,24 +240,28 @@ role_assignments = {
 - **Hardcoded values** that should be configurable
 - **Security compromises** (static credentials, overly broad permissions)
 - **GitHub API workarounds** that violate platform constraints
+- **Container App specific solutions** when generic approaches exist
 
 ### What TO Prioritize
+- **Generic infrastructure support** that works with any Azure service
 - **Security best practices** and least privilege
 - **Clear documentation** with working examples
 - **Backward compatibility** when possible
 - **Enterprise-ready solutions** that scale
+- **Dynamic, convention-based approaches** over hardcoded logic
 
 ### Common Gotchas
 - GitHub API limitations are real and must be worked around
 - Stratus naming conventions are mandatory, not suggestions
 - Remote state integration is critical for the architecture
 - Corporate network restrictions affect testing and deployment
+- Module is generic but workflows are still Stratus-opinionated
 
 ### Testing Strategy
 - **Unit Tests**: Terraform validation and formatting
 - **Integration Tests**: End-to-end workflow testing with GitHub App authentication
   - Creates GitHub App token for secure authentication
-  - Dispatches actual `github-environment-aca.yml` workflow
+  - Dispatches actual `github-environment-vending.yml` workflow
   - Monitors workflow execution and verifies completion
   - Validates GitHub environments and configurations were created
   - Automatically cleans up resources via destroy workflow
@@ -245,4 +270,4 @@ role_assignments = {
 
 ---
 
-> **For AI Assistants**: This project is production-ready and used by multiple teams. Changes should be conservative, well-documented, and maintain backward compatibility. When in doubt, ask for clarification about Stratus-specific requirements or corporate constraints. 
+> **For AI Assistants**: This project is production-ready and used by multiple teams. The module is now generic for any Azure infrastructure while maintaining Stratus workflow patterns. Changes should be conservative, well-documented, and maintain backward compatibility. When in doubt, ask for clarification about Stratus-specific requirements or corporate constraints. 

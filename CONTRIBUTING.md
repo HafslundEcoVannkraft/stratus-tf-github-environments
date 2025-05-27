@@ -104,7 +104,7 @@ For complex changes:
 
 ```bash
 # Validate YAML examples
-yamllint examples/*.yaml
+yq . examples/*.yaml
 
 # Test example configurations
 terraform plan -var-file=test/test.tfvars

@@ -96,14 +96,14 @@ resource "azurerm_resource_group" "github_identities" {
 # MANAGED IDENTITIES AND FEDERATED CREDENTIALS
 # =============================================================================
 
-# Creates managed identities for application repositories
-module "managed_identity_app_repositories" {
+# Creates managed identities for GitHub environments
+module "github_environment_identity" {
   source  = "Azure/avm-res-managedidentity-userassignedidentity/azurerm"
   version = "0.3.3"
 
-  for_each = { for item in local.flattened_repo_environments : item.key => item }
+  for_each = local.environments_map
 
-  name                = "${local.naming.managed_identity_prefix}-${each.value.repo}-${each.value.environment}"
+  name                = "${local.naming.managed_identity_prefix}-${each.value.repository}-${each.value.environment}"
   location            = var.location
   resource_group_name = azurerm_resource_group.github_identities.name
   enable_telemetry    = true
@@ -111,24 +111,25 @@ module "managed_identity_app_repositories" {
   # Add tags to managed identities
   tags = merge(local.common_tags, {
     ResourceType      = "managed-identity"
-    GitHubRepository  = each.value.repo
+    GitHubRepository  = each.value.repository
     GitHubEnvironment = each.value.environment
+    DeploymentTarget  = try(each.value.metadata.deployment_target, "generic")
     EnvironmentKey    = each.key
   })
 }
 
 # Create Federated identity credential for GitHub environments
-resource "azapi_resource" "github_federated_credential" {
-  for_each = { for item in local.flattened_repo_environments : item.key => item }
+resource "azapi_resource" "github_environment_federated_credential" {
+  for_each = local.environments_map
 
   type      = "Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31"
-  name      = "${each.value.repo}-${each.value.environment}"
-  parent_id = module.managed_identity_app_repositories[each.key].resource_id
+  name      = "${each.value.repository}-${each.value.environment}"
+  parent_id = module.github_environment_identity[each.key].resource_id
   body = {
     properties = {
       audiences = ["api://AzureADTokenExchange"]
       issuer    = "https://token.actions.githubusercontent.com"
-      subject   = "repo:${var.github_owner}/${each.value.repo}:environment:${each.value.environment}"
+      subject   = "repo:${var.github_owner}/${each.value.repository}:environment:${each.value.environment}"
     }
   }
   response_export_values    = ["*"]
@@ -142,7 +143,7 @@ resource "azapi_resource" "github_federated_credential" {
 # Role assignments defined in remote state github_environment_config
 # This replaces all hardcoded role assignments with a flexible approach
 # where the upstream infrastructure defines exactly what permissions each environment needs
-resource "azurerm_role_assignment" "github_environment_roles_from_remote_state" {
+resource "azurerm_role_assignment" "github_environment_role_assignment" {
   for_each = local.role_assignments_map
 
   scope                = each.value.scope
@@ -151,6 +152,6 @@ resource "azurerm_role_assignment" "github_environment_roles_from_remote_state" 
   principal_type       = "ServicePrincipal"
 
   depends_on = [
-    module.managed_identity_app_repositories
+    module.github_environment_identity
   ]
 }

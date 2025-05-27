@@ -1,9 +1,9 @@
-# Minimal configuration for Azure Container App GitHub Environments
+# Minimal configuration for GitHub Environments
 # This is the simplest possible configuration to get started
 #
 # This example demonstrates:
 # - Basic repository and environment setup
-# - Container App Environment mapping
+# - Metadata for deployment-specific configuration
 # - Essential security configurations
 # - Minimal approval requirements
 
@@ -12,23 +12,25 @@ repositories:
     environments:
       # Basic development environment with minimal restrictions
       - name: dev
-        container_environment: dev  # Maps to "dev" key in remote state environments
         wait_timer: 0               # No wait time for development
         prevent_self_review: false  # Allow self-approval for quick iteration
         reviewers:
           users: []                 # No required reviewers for development
           teams: []
         # No deployment policy = any branch can deploy
+        metadata:
+          deployment_target: dev  # Maps to "dev" key in remote state environments
       
       # Production environment with basic protections
       - name: prod
-        container_environment: prod  # Maps to "prod" key in remote state environments
         wait_timer: 10              # Brief wait to prevent accidental deployments
         prevent_self_review: true   # Require approval from someone else
         reviewers:
           users:
             - username: "your-admin-username"  # Replace with actual GitHub username
           teams: []
+        metadata:
+          deployment_target: prod  # Maps to "prod" key in remote state environments
 
 # Quick Setup Notes:
 # 1. Replace "your-app-repo" with your actual GitHub repository name
@@ -36,3 +38,4 @@ repositories:
 # 3. Ensure the remote state contains "dev" and "prod" environments with proper configuration
 # 4. This creates 2 GitHub environments with automatic Azure OIDC federation
 # 5. Variables and role assignments come from the remote state automatically
+# 6. The metadata.deployment_target maps to deployment targets in your remote state

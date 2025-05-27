@@ -1,0 +1,518 @@
+name: Integration Tests (Internal)
+
+# This workflow is designed for internal testing of the stratus-tf-github-environments module
+# It runs on internal runners with subnet connectivity and can be easily triggered via gh CLI
+#
+# Usage:
+#   gh workflow run integration-test-internal.yml \
+#     -f module_repo_ref=main \
+#     -f target_repo=HafslundEcoVannkraft/stratus-tf-github-environments \
+#     -f destroy_after_test=true
+#
+# Required Azure Permissions for Service Principal:
+# - Managed Identity Contributor role (to create/delete managed identities)
+# - Storage Blob Data Contributor role (for Terraform state access)
+# - Role assignments as defined in remote state github_environment_config
+# - Federated credential configured for the "integration-test" environment
+#
+# Note: This module does NOT require Contributor role on the subscription.
+# Role assignments for test environments are dynamically read from remote state,
+# and the service principal only needs permissions to assign those specific roles.
+# The actual permissions needed depend on what's defined in your remote state configuration.
+
+on:
+  workflow_dispatch:
+    inputs:
+      module_repo_ref:
+        description: 'Git reference (branch, tag, or commit SHA) of the module repository to test'
+        required: false
+        default: 'main'
+        type: string
+      target_repo:
+        description: 'Target repository to test (owner/repo format)'
+        required: false
+        default: 'HafslundEcoVannkraft/stratus-tf-github-environments'
+        type: string
+      test_files:
+        description: 'Comma-separated list of test files to run (leave empty for all)'
+        required: false
+        type: string
+      destroy_after_test:
+        description: 'Destroy resources after test completion'
+        required: false
+        default: 'true'
+        type: boolean
+      github_owner:
+        description: 'GitHub organization or user name for testing'
+        required: false
+        default: 'HafslundEcoVannkraft'
+        type: string
+
+env:
+  TF_WORKSPACE: terraform-work
+  # Azure authentication via OIDC
+  ARM_USE_OIDC: true
+  ARM_USE_AZUREAD: true
+  ARM_STORAGE_USE_AZUREAD: true
+  # Terraform configuration
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+
+permissions:
+  id-token: write
+  contents: read
+  actions: write
+
+jobs:
+  prepare:
+    name: Prepare Test Environment
+    runs-on: stratus-github-hosted
+    environment: integration-test
+    timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      tfvars_file: ${{ steps.prepare-files.outputs.tfvars_file }}
+      cache_key: ${{ steps.create-cache-key.outputs.cache_key }}
+      tf_workspace: ${{ steps.prepare-files.outputs.tf_workspace }}
+      environment: ${{ steps.prepare-files.outputs.environment }}
+      github_token: ${{ steps.app-token.outputs.token }}
+      test_files_count: ${{ steps.set-matrix.outputs.test_files_count }}
+      target_repo: ${{ github.event.inputs.target_repo }}
+    steps:
+      - name: Checkout target module repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.target_repo }}
+          ref: ${{ github.event.inputs.module_repo_ref }}
+
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: ${{ github.event.inputs.github_owner }}
+
+      - name: Setup yq
+        uses: mikefarah/yq@v4.40.5
+
+      - name: Set test matrix
+        id: set-matrix
+        run: |
+          echo "🔍 Discovering test files..."
+          
+          # Check if specific test files were requested
+          if [ -n "${{ github.event.inputs.test_files }}" ]; then
+            echo "📋 Using specified test files: ${{ github.event.inputs.test_files }}"
+            IFS=',' read -ra SPECIFIED_FILES <<< "${{ github.event.inputs.test_files }}"
+            yaml_files=""
+            for file in "${SPECIFIED_FILES[@]}"; do
+              file=$(echo "$file" | xargs)  # trim whitespace
+              if [ -f "tests/$file" ]; then
+                yaml_files="$yaml_files tests/$file"
+              else
+                echo "❌ Specified test file not found: tests/$file"
+                exit 1
+              fi
+            done
+          else
+            # Find all YAML files in tests folder
+            yaml_files=$(find tests -name "*.yaml" -o -name "*.yml" | sort)
+          fi
+          
+          # Validate files exist
+          if [ -z "$yaml_files" ]; then
+            echo "❌ No YAML test files found"
+            exit 1
+          fi
+          
+          echo "📋 Test files to process:"
+          echo "$yaml_files"
+          
+          # Validate each file
+          file_count=0
+          for file in $yaml_files; do
+            echo "🔍 Validating $file..."
+            
+            if ! yq eval '.' "$file" > /dev/null 2>&1; then
+              echo "❌ Invalid YAML file: $file"
+              exit 1
+            fi
+            
+            if ! yq eval '.repositories' "$file" > /dev/null 2>&1; then
+              echo "❌ Missing 'repositories' key in: $file"
+              exit 1
+            fi
+            
+            repo_count=$(yq eval '.repositories | length' "$file")
+            if [ "$repo_count" -eq 0 ]; then
+              echo "❌ Empty repositories array in: $file"
+              exit 1
+            fi
+            
+            echo "✅ Valid test file: $file ($repo_count repositories)"
+            file_count=$((file_count + 1))
+          done
+          
+          # Create JSON array for matrix
+          matrix_json="["
+          first=true
+          for file in $yaml_files; do
+            if [ "$first" = true ]; then
+              first=false
+            else
+              matrix_json+=","
+            fi
+            filename=$(basename "$file")
+            matrix_json+="{\"github_env_file\":\"$filename\"}"
+          done
+          matrix_json+="]"
+          
+          if ! echo "$matrix_json" | jq . > /dev/null 2>&1; then
+            echo "❌ Generated invalid JSON matrix"
+            exit 1
+          fi
+          
+          echo "matrix=$matrix_json" >> $GITHUB_OUTPUT
+          echo "test_files_count=$file_count" >> $GITHUB_OUTPUT
+          echo "✅ Test matrix created with $file_count files"
+
+      - name: Prepare files for testing
+        id: prepare-files
+        run: |
+          echo "📁 Preparing test environment..."
+          
+          TFVARS_FILE="tests/dev.tfvars"
+          
+          if [ ! -f "$TFVARS_FILE" ]; then
+            echo "❌ Error: dev.tfvars file not found in tests folder"
+            exit 1
+          fi
+
+          mkdir -p ${{ env.TF_WORKSPACE }}
+          
+          echo "📋 Copying files..."
+          cp *.tf ${{ env.TF_WORKSPACE }}/
+          cp -r tests/ ${{ env.TF_WORKSPACE }}/
+          
+          cp "$TFVARS_FILE" ${{ env.TF_WORKSPACE }}/
+          TFVARS_FILE="${{ env.TF_WORKSPACE }}/$(basename "$TFVARS_FILE")"
+
+          echo "🔧 Extracting configuration..."
+          
+          if ! grep -q 'code_name' "$TFVARS_FILE" || ! grep -q 'environment' "$TFVARS_FILE"; then
+            echo "❌ Missing required variables in tfvars file"
+            exit 1
+          fi
+          
+          CODE_NAME=$(grep 'code_name' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
+          ENVIRONMENT=$(grep 'environment' "$TFVARS_FILE" | cut -d '=' -f2 | tr -d ' "')
+          
+          if [ -z "$CODE_NAME" ] || [ -z "$ENVIRONMENT" ]; then
+            echo "❌ Failed to extract configuration variables"
+            exit 1
+          fi
+          
+          echo "✅ Configuration: code_name=$CODE_NAME, environment=$ENVIRONMENT"
+
+          tail -c1 "$TFVARS_FILE" | read -r _ || echo >> "$TFVARS_FILE"
+
+          echo "🔧 Adding test-specific variables..."
+          {
+            echo "github_owner = \"${{ github.event.inputs.github_owner }}\""
+            echo "module_repo_ref = \"${{ github.event.inputs.module_repo_ref }}\""
+            echo "iac_repo_url = \"${{ github.server_url }}/${{ github.event.inputs.target_repo }}\""
+          } >> "$TFVARS_FILE"
+
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+          echo "code_name=$CODE_NAME" >> $GITHUB_OUTPUT
+          echo "tfvars_file=$(basename $TFVARS_FILE)" >> $GITHUB_OUTPUT
+          echo "tf_workspace=${{ env.TF_WORKSPACE }}" >> $GITHUB_OUTPUT
+          
+          echo "✅ Files prepared successfully"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3.1.2
+
+      - name: Terraform Format
+        working-directory: ${{ env.TF_WORKSPACE }}
+        run: |
+          echo "🎨 Formatting Terraform files..."
+          terraform fmt --recursive
+          echo "✅ Terraform formatting completed"
+
+      - name: Create cache key
+        id: create-cache-key
+        working-directory: ${{ env.TF_WORKSPACE }}
+        run: |
+          echo "🔑 Creating cache key..."
+          hash_files=$(find . -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum | cut -d' ' -f1)
+          cache_key="${{ steps.prepare-files.outputs.code_name }}-${{ steps.prepare-files.outputs.environment }}-$hash_files-${{ github.event.inputs.module_repo_ref }}"
+          echo "cache_key=$cache_key" >> $GITHUB_OUTPUT
+          echo "✅ Cache key created: $cache_key"
+
+      - name: Cache workspace
+        uses: actions/cache@v4.2.3
+        with:
+          key: ${{ steps.create-cache-key.outputs.cache_key }}
+          path: ${{ env.TF_WORKSPACE }}
+
+  test-sequential:
+    name: Test ${{ matrix.github_env_file }}
+    runs-on: stratus-github-hosted
+    needs: prepare
+    timeout-minutes: 60
+    environment: integration-test
+    env:
+      ARM_USE_OIDC: true
+      ARM_USE_AZUREAD: true
+      ARM_STORAGE_USE_AZUREAD: true
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TF_IN_AUTOMATION: true
+      TF_INPUT: false
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
+      fail-fast: false
+      max-parallel: 1
+    steps:
+      - name: Checkout target module repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.prepare.outputs.target_repo }}
+          ref: ${{ github.event.inputs.module_repo_ref }}
+
+      - name: Restore workspace cache
+        uses: actions/cache@v4.2.3
+        with:
+          key: ${{ needs.prepare.outputs.cache_key }}
+          path: ${{ needs.prepare.outputs.tf_workspace }}
+          fail-on-cache-miss: true
+
+      - name: Prepare environment file for matrix item
+        run: |
+          echo "🔧 Preparing environment file: ${{ matrix.github_env_file }}"
+          
+          if [ ! -f "tests/${{ matrix.github_env_file }}" ]; then
+            echo "❌ Test file not found: tests/${{ matrix.github_env_file }}"
+            exit 1
+          fi
+          
+          cp tests/${{ matrix.github_env_file }} ${{ needs.prepare.outputs.tf_workspace }}/
+          echo "github_env_file = \"${{ matrix.github_env_file }}\"" >> ${{ needs.prepare.outputs.tf_workspace }}/${{ needs.prepare.outputs.tfvars_file }}
+          
+          echo "✅ Environment file prepared: ${{ matrix.github_env_file }}"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_version: latest
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        working-directory: ${{ needs.prepare.outputs.tf_workspace }}
+        run: |
+          echo "🔧 Initializing Terraform..."
+          
+          STATE_STORAGE_ACCOUNT=$(grep 'state_storage_account_name' ${{ needs.prepare.outputs.tfvars_file }} | cut -d '=' -f2 | tr -d ' "')
+          
+          if [ -z "$ARM_CLIENT_ID" ] || [ -z "$ARM_TENANT_ID" ] || [ -z "$ARM_SUBSCRIPTION_ID" ]; then
+            echo "❌ Missing required Azure authentication environment variables"
+            exit 1
+          fi
+          
+          echo "✅ Azure OIDC authentication configured"
+          echo "  - Testing module: ${{ needs.prepare.outputs.target_repo }}@${{ github.event.inputs.module_repo_ref }}"
+          echo "  - Storage Account: $STATE_STORAGE_ACCOUNT"
+          
+          terraform init \
+            -backend-config="resource_group_name=${{ needs.prepare.outputs.environment }}-state-rg" \
+            -backend-config="storage_account_name=$STATE_STORAGE_ACCOUNT" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=github_environments_${{ needs.prepare.outputs.environment }}_${{ matrix.github_env_file }}.tfstate" \
+            -backend-config="use_azuread_auth=true"
+          
+          echo "✅ Terraform initialized successfully"
+
+      - name: Plan
+        id: plan
+        working-directory: ${{ needs.prepare.outputs.tf_workspace }}
+        run: |
+          echo "📋 Running Terraform plan..."
+          
+          terraform plan \
+            -var-file="${{ needs.prepare.outputs.tfvars_file }}" \
+            -var="github_token=${{ needs.prepare.outputs.github_token }}" \
+            -out=tfplan \
+            -detailed-exitcode
+          
+          PLAN_EXIT_CODE=$?
+          echo "plan_exit_code=$PLAN_EXIT_CODE" >> $GITHUB_OUTPUT
+          
+          if [ $PLAN_EXIT_CODE -eq 0 ]; then
+            echo "✅ No changes detected"
+            echo "plan_status=no_changes" >> $GITHUB_OUTPUT
+          elif [ $PLAN_EXIT_CODE -eq 2 ]; then
+            echo "📝 Changes detected, plan created successfully"
+            echo "plan_status=changes_detected" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Terraform plan failed"
+            echo "plan_status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Apply
+        id: apply
+        if: steps.plan.outputs.plan_status != 'failed'
+        working-directory: ${{ needs.prepare.outputs.tf_workspace }}
+        run: |
+          echo "🚀 Running Terraform apply..."
+          
+          if [ "${{ steps.plan.outputs.plan_status }}" = "no_changes" ]; then
+            echo "ℹ️ No changes to apply"
+            echo "apply_status=no_changes" >> $GITHUB_OUTPUT
+          else
+            terraform apply tfplan
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Terraform apply completed successfully"
+              echo "apply_status=success" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Terraform apply failed"
+              echo "apply_status=failed" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          fi
+
+      - name: Verify GitHub Environments
+        if: steps.apply.outputs.apply_status == 'success' || steps.apply.outputs.apply_status == 'no_changes'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ needs.prepare.outputs.github_token }}
+          retries: 3
+          script: |
+            const fs = require('fs');
+            const yaml = require('js-yaml');
+            
+            console.log('🔍 Verifying GitHub environments for ${{ matrix.github_env_file }}...');
+            
+            const configPath = 'tests/${{ matrix.github_env_file }}';
+            const configContent = fs.readFileSync(configPath, 'utf8');
+            const config = yaml.load(configContent);
+            
+            let totalChecks = 0;
+            let passedChecks = 0;
+            let failedChecks = [];
+            
+            for (const repoConfig of config.repositories) {
+              const repoName = repoConfig.repo;
+              console.log(`\n📦 Verifying repository: ${repoName}`);
+              
+              for (const envConfig of repoConfig.environments) {
+                const envName = envConfig.name;
+                console.log(`\n🌍 Verifying environment: ${envName}`);
+                
+                try {
+                  totalChecks++;
+                  
+                  // Check if environment exists
+                  const envResponse = await github.rest.repos.getEnvironment({
+                    owner: '${{ github.event.inputs.github_owner }}',
+                    repo: repoName,
+                    environment_name: envName
+                  });
+                  
+                  console.log(`✅ Environment exists: ${envName}`);
+                  passedChecks++;
+                  
+                  // Verify environment variables
+                  if (envConfig.variables && Object.keys(envConfig.variables).length > 0) {
+                    totalChecks++;
+                    try {
+                      const varsResponse = await github.rest.repos.listEnvironmentVariables({
+                        owner: '${{ github.event.inputs.github_owner }}',
+                        repo: repoName,
+                        environment_name: envName
+                      });
+                      
+                      console.log(`✅ Environment variables configured for ${envName}`);
+                      passedChecks++;
+                    } catch (error) {
+                      console.log(`❌ Failed to verify variables for ${envName}: ${error.message}`);
+                      failedChecks.push(`${envName}: Variable verification failed`);
+                    }
+                  }
+                  
+                } catch (error) {
+                  console.error(`❌ Environment ${envName} verification failed:`, error.message);
+                  failedChecks.push(`${envName}: Environment verification failed`);
+                }
+              }
+            }
+            
+            // Summary
+            console.log(`\n📊 Verification Summary for ${{ matrix.github_env_file }}:`);
+            console.log(`✅ Passed: ${passedChecks}/${totalChecks}`);
+            
+            if (failedChecks.length > 0) {
+              console.log(`❌ Failed checks:`);
+              failedChecks.forEach(check => console.log(`  - ${check}`));
+              throw new Error(`Verification failed: ${failedChecks.length} checks failed`);
+            } else {
+              console.log(`🎉 All verification checks passed!`);
+            }
+
+      - name: Cleanup (Destroy)
+        if: always() && github.event.inputs.destroy_after_test == 'true'
+        working-directory: ${{ needs.prepare.outputs.tf_workspace }}
+        run: |
+          echo "🧹 Cleaning up resources..."
+          
+          if [ -f "tfplan" ]; then
+            echo "🗑️ Destroying resources created during test..."
+            terraform destroy \
+              -var-file="${{ needs.prepare.outputs.tfvars_file }}" \
+              -var="github_token=${{ needs.prepare.outputs.github_token }}" \
+              -auto-approve
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Resources destroyed successfully"
+            else
+              echo "⚠️ Some resources may not have been destroyed - manual cleanup may be required"
+            fi
+          else
+            echo "ℹ️ No resources to destroy (no plan file found)"
+          fi
+
+  summary:
+    name: Test Summary
+    runs-on: stratus-github-hosted
+    needs: [prepare, test-sequential]
+    if: always()
+    steps:
+      - name: Test Results Summary
+        run: |
+          echo "🎯 Integration Test Summary"
+          echo "=========================="
+          echo "📦 Target Repository: ${{ needs.prepare.outputs.target_repo }}"
+          echo "🏷️ Module Reference: ${{ github.event.inputs.module_repo_ref }}"
+          echo "📋 Test Files: ${{ needs.prepare.outputs.test_files_count }}"
+          echo "🧹 Cleanup: ${{ github.event.inputs.destroy_after_test }}"
+          echo ""
+          
+          if [ "${{ needs.test-sequential.result }}" = "success" ]; then
+            echo "✅ All tests passed successfully!"
+          elif [ "${{ needs.test-sequential.result }}" = "failure" ]; then
+            echo "❌ Some tests failed - check individual job logs for details"
+            exit 1
+          else
+            echo "⚠️ Tests completed with warnings or were skipped"
+          fi 

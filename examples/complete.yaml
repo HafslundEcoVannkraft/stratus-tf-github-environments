@@ -1,13 +1,13 @@
-# Complete configuration for Azure Container App GitHub Environments
+# Complete configuration for GitHub Environments
 # This example demonstrates all available features and best practices
 #
 # Features demonstrated:
 # - Multiple repositories with different configurations
-# - Container App Environment mapping (container_environment property)
+# - Metadata for deployment-specific configuration (e.g., deployment target mapping)
 # - Various deployment policies (branch, tag, protected branches)
 # - Different approval requirements and wait timers
 # - Custom environment variables
-# - Plan vs Apply environment patterns
+# - CI vs CD environment patterns
 # - Production-grade security configurations
 
 repositories:
@@ -15,21 +15,21 @@ repositories:
   - repo: your-web-app-repo
     environments:
       # Development: Minimal restrictions for rapid iteration
-      - name: dev-plan
-        container_environment: dev # Maps to "dev" key in remote state environments
+      - name: dev-ci
         wait_timer: 0 # No wait time for development
         prevent_self_review: false # Allow self-approval for development
         reviewers:
-          users: [] # No required reviewers for plan operations
+          users: [] # No required reviewers for CI operations
           teams: []
-        # No branch policy = any branch can trigger plan operations
+        # No branch policy = any branch can trigger CI operations
         variables:
           DEBUG_MODE: "true" # Development-specific variables
           LOG_LEVEL: "debug"
           FEATURE_FLAGS: "experimental"
+        metadata:
+          deployment_target: dev # Maps to "dev" key in remote state environments metadata
 
-      - name: dev-apply
-        container_environment: dev # Same Azure environment, different protections
+      - name: dev-cd
         wait_timer: 5 # Brief wait to prevent accidental deployments
         prevent_self_review: true # Require different person for approval
         reviewers:
@@ -41,19 +41,21 @@ repositories:
           protected_branches: false
           custom_branch_policies: true
           branch_pattern: ["main", "develop", "feature/*"] # Allow feature branches
+        metadata:
+          deployment_target: dev # Same Azure environment, different protections
 
       # Staging: Enhanced protections with shared Azure environment
-      - name: staging-plan
-        container_environment: staging # Maps to "staging" key in remote state
+      - name: staging-ci
         wait_timer: 0
         prevent_self_review: false
         reviewers:
           users: []
           teams: []
-        # Plan operations typically don't need restrictions
+        # CI operations typically don't need restrictions
+        metadata:
+          deployment_target: staging # Maps to "staging" key in remote state environments metadata
 
-      - name: staging-apply
-        container_environment: staging
+      - name: staging-cd
         wait_timer: 10 # Longer wait for staging deployments
         prevent_self_review: true
         reviewers:
@@ -67,20 +69,22 @@ repositories:
         variables:
           ENVIRONMENT_TYPE: "staging"
           MONITORING_LEVEL: "standard"
+        metadata:
+          deployment_target: staging
 
       # Production: Maximum security with tag-based deployments
-      - name: prod-plan
-        container_environment: prod # Maps to "prod" key in remote state environments
+      - name: prod-ci
         wait_timer: 0
-        prevent_self_review: true # Even plan operations require approval
+        prevent_self_review: true # Even CI operations require approval
         reviewers:
           users:
             - username: "prod-admin"
           teams:
             - name: "platform-team"
+        metadata:
+          deployment_target: prod # Maps to "prod" key in remote state environments
 
-      - name: prod-apply
-        container_environment: prod
+      - name: prod-cd
         wait_timer: 30 # Extended wait time for production
         prevent_self_review: true
         reviewers:
@@ -98,13 +102,14 @@ repositories:
           ENVIRONMENT_TYPE: "production"
           MONITORING_LEVEL: "enhanced"
           SECURITY_SCANNING: "enabled"
+        metadata:
+          deployment_target: prod
 
   # Example 2: Background processing service with different patterns
   - repo: your-background-jobs-repo
     environments:
       # Development: Simple configuration for background jobs
       - name: jobs-dev
-        container_environment: background-jobs # Different Container App Environment
         wait_timer: 0
         prevent_self_review: false
         reviewers:
@@ -118,10 +123,11 @@ repositories:
           JOB_CONCURRENCY: "5"
           BATCH_SIZE: "100"
           DEBUG_JOBS: "true"
+        metadata:
+          deployment_target: background-jobs # Different deployment target
 
       # Production: Strict controls for background processing
       - name: jobs-prod
-        container_environment: background-jobs-prod
         wait_timer: 15 # Moderate wait time
         prevent_self_review: true
         reviewers:
@@ -135,21 +141,23 @@ repositories:
           JOB_CONCURRENCY: "20"
           BATCH_SIZE: "1000"
           MONITORING_ENABLED: "true"
+        metadata:
+          deployment_target: background-jobs-prod
 
   # Example 3: API service with microservice patterns
   - repo: your-api-service-repo
     environments:
       # API Development with feature branch support
-      - name: api-dev-plan
-        container_environment: api-services # Dedicated Container App Environment for APIs
+      - name: api-dev-ci
         wait_timer: 0
         prevent_self_review: false
         reviewers:
           users: []
           teams: []
+        metadata:
+          deployment_target: api-services # Dedicated deployment target for APIs
 
-      - name: api-dev-apply
-        container_environment: api-services
+      - name: api-dev-cd
         wait_timer: 2
         prevent_self_review: true
         reviewers:
@@ -163,10 +171,11 @@ repositories:
           API_VERSION: "v1"
           RATE_LIMITING: "development"
           CORS_ORIGINS: "*"
+        metadata:
+          deployment_target: api-services
 
       # API Production with strict version control
-      - name: api-prod-apply
-        container_environment: api-services-prod
+      - name: api-prod-cd
         wait_timer: 20
         prevent_self_review: true
         reviewers:
@@ -185,16 +194,72 @@ repositories:
           RATE_LIMITING: "production"
           CORS_ORIGINS: "https://app.example.com,https://admin.example.com"
           SECURITY_HEADERS: "enabled"
+        metadata:
+          deployment_target: api-services-prod
+
+  # Example 4: Custom role assignment conventions
+  - repo: your-custom-workflow-repo
+    environments:
+      # Custom validation environment
+      - name: prod-validate
+        wait_timer: 0
+        prevent_self_review: false
+        reviewers:
+          teams:
+            - name: "validation-team"
+        variables:
+          VALIDATION_MODE: "strict"
+        metadata:
+          deployment_target: custom-workflow # Gets role_assignments.validate
+
+      # Custom deployment environment  
+      - name: prod-deploy
+        wait_timer: 15
+        prevent_self_review: true
+        reviewers:
+          teams:
+            - name: "deployment-team"
+        variables:
+          DEPLOYMENT_MODE: "production"
+        metadata:
+          deployment_target: custom-workflow # Gets role_assignments.deploy
+
+  # Example 5: Generic GitHub environment (no deployment-specific configuration)
+  - repo: your-docs-repo
+    environments:
+      # Documentation deployment environment
+      - name: docs-deploy
+        wait_timer: 0
+        prevent_self_review: false
+        reviewers:
+          teams:
+            - name: "docs-team"
+        deployment_branch_policy:
+          protected_branches: false
+          custom_branch_policies: true
+          branch_pattern: ["main", "docs/*"]
+        variables:
+          SITE_URL: "https://docs.example.com"
+          BUILD_ENV: "production"
+        # No metadata - this is a generic GitHub environment
+        # It will still get Azure managed identity but no deployment-specific configuration
+
 # Configuration Notes:
 #
-# 1. Container App Environment Mapping:
-#    - Each 'container_environment' maps to a key in the remote state's environments map
-#    - Multiple GitHub environments can target the same Container App Environment
-#    - This enables different approval workflows for the same infrastructure
+# 1. Metadata Structure:
+#    - metadata.deployment_target maps to deployment targets in remote state
+#    - Metadata is optional - environments without it are generic GitHub environments
+#    - You can add other metadata fields for different deployment types
 #
-# 2. Security Patterns:
-#    - Plan environments: Read-only operations, minimal approvals
-#    - Apply environments: Write operations, strict approvals
+# 2. Dynamic Role Assignment Convention:
+#    - Environment names ending with "-{suffix}" automatically get role_assignments.{suffix}
+#    - Examples: "prod-ci" gets role_assignments.ci, "dev-test" gets role_assignments.test
+#    - "global" role assignments are always applied regardless of suffix
+#    - This allows for any custom convention (ci/cd, test/deploy, validate/apply, etc.)
+#
+# 3. Security Patterns:
+#    - CI environments: Read-only operations, minimal approvals
+#    - CD environments: Write operations, strict approvals
 #    - Production: Tag-based deployments, multiple approvers, extended wait times
 #
 # 3. Branch vs Tag Patterns:
@@ -203,7 +268,7 @@ repositories:
 #    - Cannot mix protected_branches=true with tag_pattern (GitHub API limitation)
 #
 # 4. Variable Precedence:
-#    - Remote state variables (from infrastructure)
+#    - Remote state variables (from infrastructure, if deployment_target specified)
 #    - Per-environment managed identity variables (AZURE_CLIENT_ID, etc.)
 #    - YAML variables (highest precedence, can override above)
 #
@@ -212,3 +277,31 @@ repositories:
 #    - Teams: Specify with 'name' OR 'slug' (not both)
 #    - Multiple users/teams create OR conditions
 #    - Multiple reviewers in same environment create AND conditions
+#
+# 6. Example Remote State Structure for Dynamic Role Assignments:
+#    github_environments:
+#      - repository: "my-app"
+#        name: "prod"
+#        metadata:
+#          deployment_target: "production"
+#        role_assignments:
+#          global:                    # Always applied
+#            - role: "Reader"
+#              scope: "/subscriptions/xxx"
+#          ci:                        # Applied to environments ending with "-ci"
+#            - role: "Reader"
+#              scope: "/resourceGroups/my-app-rg"
+#          cd:                        # Applied to environments ending with "-cd"
+#            - role: "Contributor"
+#              scope: "/resourceGroups/my-app-rg"
+#          validate:                  # Applied to environments ending with "-validate"
+#            - role: "Reader"
+#              scope: "/resourceGroups/my-app-rg"
+#          deploy:                    # Applied to environments ending with "-deploy"
+#            - role: "Contributor"
+#              scope: "/resourceGroups/my-app-rg"
+#
+# 7. Generic vs Deployment-Specific Environments:
+#    - Environments with metadata.deployment_target get deployment-specific configuration
+#    - Environments without metadata are generic GitHub environments with Azure managed identity
+#    - Both types get OIDC federation and can be used for any Azure deployments

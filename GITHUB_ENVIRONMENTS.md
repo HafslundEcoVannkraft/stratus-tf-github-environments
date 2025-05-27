@@ -52,7 +52,7 @@ GH_APP_ID=your-github-app-id
 # Set variables
 APP_ID="your-service-principal-app-id"
 REPO_OWNER="HafslundEcoVannkraft"
-REPO_NAME="stratus-tf-aca-gh-vending"
+REPO_NAME="stratus-tf-github-environments"
 ENVIRONMENT_NAME="integration-test"
 
 # Create federated credential for the integration-test environment
@@ -75,16 +75,16 @@ az ad app federated-credential create \
 5. Select **GitHub Actions deploying Azure resources**
 6. Configure:
    - **Organization**: `HafslundEcoVannkraft`
-   - **Repository**: `stratus-tf-aca-gh-vending`
+   - **Repository**: `stratus-tf-github-environments`
    - **Entity type**: `Environment`
    - **Environment name**: `integration-test`
-   - **Name**: `stratus-tf-aca-gh-vending-integration-test`
+   - **Name**: `stratus-tf-github-environments-integration-test`
 
 ## 🔍 **Federated Credential Subject Claims**
 
 ### **Environment-Specific Subject**
 ```
-repo:HafslundEcoVannkraft/stratus-tf-aca-gh-vending:environment:integration-test
+repo:HafslundEcoVannkraft/stratus-tf-github-environments:environment:integration-test
 ```
 
 **Benefits:**
@@ -94,7 +94,7 @@ repo:HafslundEcoVannkraft/stratus-tf-aca-gh-vending:environment:integration-test
 
 ### **Comparison with Repository-Wide Subject**
 ```
-repo:HafslundEcoVannkraft/stratus-tf-aca-gh-vending:ref:refs/heads/main
+repo:HafslundEcoVannkraft/stratus-tf-github-environments:ref:refs/heads/main
 ```
 
 **Limitations:**
@@ -157,10 +157,10 @@ az ad app federated-credential create --id $APP_ID --parameters @new-credential.
 ### **Verify Environment Setup**
 ```bash
 # Check environment configuration
-gh api repos/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/environments/integration-test
+gh api repos/HafslundEcoVannkraft/stratus-tf-github-environments/environments/integration-test
 
 # List environment variables
-gh api repos/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/environments/integration-test/variables
+gh api repos/HafslundEcoVannkraft/stratus-tf-github-environments/environments/integration-test/variables
 ```
 
 ### **Test Federated Credential**

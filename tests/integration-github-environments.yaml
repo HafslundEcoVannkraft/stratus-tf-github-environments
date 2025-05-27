@@ -3,7 +3,6 @@ repositories:
     environments:
       # Comprehensive test environment - all features enabled
       - name: "comprehensive-test"
-        container_environment: "default"
         wait_timer: 30
         prevent_self_review: true
         reviewers:
@@ -22,10 +21,11 @@ repositories:
           custom_branch_policies: true
           branch_pattern: ["main", "develop", "feature/*", "hotfix/*"]
           tag_pattern: ["v*", "release-*", "hotfix-*", "rc-*"]
+        metadata:
+          deployment_target: "default"
 
       # Edge case test - maximum wait timer
       - name: "max-wait-test"
-        container_environment: "default"
         wait_timer: 43200 # 12 hours - maximum allowed
         prevent_self_review: true
         reviewers:
@@ -35,10 +35,11 @@ repositories:
           TEST_TYPE: "max-wait"
           WAIT_TIMER: "43200"
           EDGE_CASE: "true"
+        metadata:
+          deployment_target: "default"
 
       # Security-focused test environment
       - name: "security-test"
-        container_environment: "default"
         wait_timer: 10
         prevent_self_review: true
         reviewers:
@@ -54,24 +55,26 @@ repositories:
         deployment_branch_policy:
           protected_branches: true
           custom_branch_policies: false
+        metadata:
+          deployment_target: "default"
 
-      # Test environment for plan operations
-      - name: "integration-test-plan"
-        container_environment: "default"
+      # Test environment for CI operations
+      - name: "integration-test-ci"
         wait_timer: 0
         prevent_self_review: false
         variables:
           INTEGRATION_TEST: "true"
-          TEST_TYPE: "plan"
+          TEST_TYPE: "ci"
           AZURE_REGION: "norwayeast"
         deployment_branch_policy:
           protected_branches: false
           custom_branch_policies: true
           branch_pattern: ["main", "develop", "integration-test"]
+        metadata:
+          deployment_target: "default"
 
-      # Test environment for apply operations with security controls
-      - name: "integration-test-apply"
-        container_environment: "default"
+      # Test environment for CD operations with security controls
+      - name: "integration-test-cd"
         wait_timer: 5
         prevent_self_review: true
         reviewers:
@@ -81,23 +84,25 @@ repositories:
             - username: "github-actions[bot]"
         variables:
           INTEGRATION_TEST: "true"
-          TEST_TYPE: "apply"
+          TEST_TYPE: "cd"
           ENVIRONMENT: "test"
           AZURE_REGION: "norwayeast"
         deployment_branch_policy:
           protected_branches: false
           custom_branch_policies: true
           tag_pattern: ["v*", "release-*", "test-*"]
+        metadata:
+          deployment_target: "default"
 
       # Test environment with minimal configuration
       - name: "integration-test-minimal"
-        container_environment: "default"
         variables:
           MINIMAL_TEST: "true"
+        metadata:
+          deployment_target: "default"
 
       # Test environment with maximum wait timer
       - name: "integration-test-max-wait"
-        container_environment: "default"
         wait_timer: 43200 # 12 hours - maximum allowed
         prevent_self_review: true
         reviewers:
@@ -106,3 +111,18 @@ repositories:
         variables:
           MAX_WAIT_TEST: "true"
           WAIT_TIMER: "43200"
+        metadata:
+          deployment_target: "default"
+
+      # Generic environment test (no deployment-specific configuration)
+      - name: "integration-test-generic"
+        wait_timer: 0
+        prevent_self_review: false
+        reviewers:
+          teams:
+            - name: "stratus-az-platform-approvers"
+        variables:
+          INTEGRATION_TEST: "true"
+          TEST_TYPE: "generic"
+          DEPLOYMENT_TARGET: "other"
+        # No metadata - this is a generic GitHub environment

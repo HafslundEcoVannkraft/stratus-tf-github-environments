@@ -1,6 +1,6 @@
 # 🔧 Troubleshooting Guide
 
-This guide helps you resolve common issues when using the `stratus-tf-aca-gh-vending` module.
+This guide helps you resolve common issues when using the `stratus-tf-github-environments` module.
 
 ## 🚨 **Most Common Issues**
 
@@ -137,14 +137,14 @@ Error: Repository 'org/repo' not found
 - Ensure your GitHub token has access to the repository
 - For private repositories, verify your token has appropriate permissions
 
-#### **Container Environment Mapping Missing**
+#### **Deployment Target Mapping Missing**
 ```
-Error: container_environment 'dev' not found in remote state
+Error: deployment_target 'dev' not found in remote state
 ```
 
 **Solutions:**
-- Check that the Container App Environment exists in your remote state
-- Verify the environment key matches exactly (case-sensitive)
+- Check that the deployment target exists in your remote state
+- Verify the deployment target key matches exactly (case-sensitive)
 - Ensure the remote state is up-to-date
 - Run `terraform refresh` on your infrastructure state first
 
@@ -276,6 +276,6 @@ If you encounter rate limiting (very unlikely with normal usage):
 - Test with minimal configuration first
 - Use plan operations before apply
 - Keep environment names short and descriptive
-- Document your container environment mappings
+- Document your deployment target mappings
 - Regular backup of Terraform state
  

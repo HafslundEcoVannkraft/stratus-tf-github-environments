@@ -1,6 +1,6 @@
 # 🔐 Authentication Guide
 
-This is the **comprehensive authentication guide** for the `stratus-tf-aca-gh-vending` module. This guide covers all authentication methods, security considerations, and troubleshooting.
+This is the **comprehensive authentication guide** for the `stratus-tf-github-environments` module. This guide covers all authentication methods, security considerations, and troubleshooting.
 
 > **📚 Related Documentation:**
 > - [README.md](./README.md) - Quick setup and usage examples
@@ -101,45 +101,20 @@ gh api user
 gh auth token
 ```
 
-### **Using GitHub CLI with Terraform**
+### **Using GitHub CLI with the Module**
 
-The terraform-provider-github **automatically detects** and uses GitHub CLI authentication when no explicit token is provided.
-
-#### **Automatic Detection (Recommended)**
-
-```hcl
-# No explicit token needed - provider automatically uses gh CLI
-provider "github" {
-  owner = "your-organization"
-}
-```
-
-#### **Explicit Token (Alternative)**
-
-```hcl
-# Explicitly use GitHub CLI token
-provider "github" {
-  owner = "your-organization"
-  token = var.github_token
-}
-```
-
-```bash
-# Set token from GitHub CLI
-export GITHUB_TOKEN=$(gh auth token)
-terraform apply
-```
+This module always runs as a **workflow dispatch** where you provide the GitHub token as a required input parameter. You don't need to configure any Terraform providers directly - the module handles all GitHub API authentication internally.
 
 ### **Using GitHub CLI to Dispatch Workflows**
 
 ```bash
 # Dispatch the vending workflow from your terminal
-gh workflow run github-environment-aca.yml \
+gh workflow run github-environment-vending.yml \
   -f github_token=$(gh auth token) \
   -f tfvars_file=dev.tfvars
 
 # Check workflow status
-gh run list --workflow=github-environment-aca.yml
+gh run list --workflow=github-environment-vending.yml
 
 # View workflow logs
 gh run view --log
@@ -159,7 +134,7 @@ If you must use Personal Access Tokens (PATs), here's how to set them up properl
 2. Click "Generate new token (classic)"
 3. Set expiration (recommend 90 days maximum)
 4. Select required scopes:
-   - ✅ `repo` - Full control of private repositories
+   - ✅ `repo` - Full control of your private repositories
    - ✅ `workflow` - Update GitHub Action workflows
    - ✅ `read:org` - Read org and team membership
 
@@ -374,7 +349,7 @@ For enterprise environments and automated testing, GitHub App authentication pro
 - **Variables**: Write (to manage environment variables)
 
 **Organization permissions:**
-- **Members**: Read (to validate team and user assignments)
+- **Administration**: Read (to validate team and user assignments)
 
 #### **3. Generate Private Key**
 
@@ -405,7 +380,7 @@ The enhanced integration test workflow uses GitHub App authentication:
 
 - name: Use App Token
   run: |
-    gh workflow run github-environment-aca.yml \
+    gh workflow run github-environment-vending.yml \
       -f github_token="${{ steps.app-token.outputs.token }}" \
       -f tfvars_file=integration-test.tfvars
 ```

@@ -80,5 +80,5 @@ This document contains beginner-friendly tasks perfect for new contributors. Mai
 
 ---
 
-**Ready to contribute?** Check our [open good first issues](https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or create one from this list! 🚀
+**Ready to contribute?** Check our [open good first issues](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) or create one from this list! 🚀
 

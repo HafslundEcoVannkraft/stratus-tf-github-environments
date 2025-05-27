@@ -3,7 +3,6 @@ repositories:
     environments:
       # Comprehensive test environment - all features enabled
       - name: "comprehensive-test"
-        container_environment: "default"
         wait_timer: 30
         prevent_self_review: true
         reviewers:
@@ -19,17 +18,18 @@ repositories:
           DEPLOYMENT_MODE: "complete"
         secrets:
           TEST_SECRET:
-            key_vault_name: "stratus-tf-aca-gh-vending-kv"
-            secret_name: "comprehensive"
+            key_vault: "stratus-tf-aca-gh-vending-kv"
+            secret_ref: "comprehensive"
         deployment_branch_policy:
           protected_branches: false
           custom_branch_policies: true
           branch_pattern: ["main", "develop", "feature/*", "hotfix/*"]
           tag_pattern: ["v*", "release-*", "hotfix-*", "rc-*"]
+        metadata:
+          deployment_target: "default"
 
       # Edge case test - maximum wait timer
       - name: "max-wait-test"
-        container_environment: "default"
         wait_timer: 43200 # 12 hours - maximum allowed
         prevent_self_review: true
         reviewers:
@@ -39,10 +39,11 @@ repositories:
           TEST_TYPE: "max-wait"
           WAIT_TIMER: "43200"
           EDGE_CASE: "true"
+        metadata:
+          deployment_target: "default"
 
       # Security-focused test environment
       - name: "security-test"
-        container_environment: "default"
         wait_timer: 10
         prevent_self_review: true
         reviewers:
@@ -57,8 +58,22 @@ repositories:
           COMPLIANCE_CHECK: "strict"
         secrets:
           SECURITY_TOKEN:
-            key_vault_name: "my-key-vault"
-            secret_value: "my-secret"
+            key_vault: "my-key-vault"
+            secret_ref: "my-secret"
         deployment_branch_policy:
           protected_branches: true
           custom_branch_policies: false
+        metadata:
+          deployment_target: "default"
+
+      # Generic environment test (no deployment-specific configuration)
+      - name: "generic-test"
+        wait_timer: 0
+        prevent_self_review: false
+        reviewers:
+          teams:
+            - name: "stratus-az-platform-approvers"
+        variables:
+          TEST_TYPE: "generic"
+          DEPLOYMENT_TARGET: "other"
+        # No metadata - this is a generic GitHub environment

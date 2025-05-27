@@ -1,4 +1,4 @@
-name: Create ACA GitHub Environments
+name: GitHub Environment Vending for Azure deployment
 
 on:
   workflow_dispatch:
@@ -70,7 +70,7 @@ jobs:
       - name: Checkout public module
         uses: actions/checkout@v4
         with:
-          repository: HafslundEcoVannkraft/stratus-tf-aca-gh-vending
+          repository: HafslundEcoVannkraft/stratus-tf-github-environments
           ref: ${{ github.event.inputs.module_repo_ref }}
           path: ${{ env.TF_WORKSPACE }}
 
@@ -140,9 +140,9 @@ jobs:
               IFS=',' read -ra PAIRS <<< "$REMOTE_STATE_CONFIG"
               for pair in "${PAIRS[@]}"; do
                 if [[ $pair == rg=* ]]; then
-                  echo "remote_state_rg = \"${pair#rg=}\""
+                  echo "remote_state_resource_group_name = \"${pair#rg=}\""
                 elif [[ $pair == sa=* ]]; then
-                  echo "remote_state_sa_name = \"${pair#sa=}\""
+                  echo "remote_state_storage_account_name = \"${pair#sa=}\""
                 elif [[ $pair == container=* ]]; then
                   echo "remote_state_container = \"${pair#container=}\""
                 elif [[ $pair == key=* ]]; then

@@ -3,6 +3,7 @@ repositories:
     environments:
       # Minimal test environment - only required fields
       - name: "minimal-test"
-        container_environment: "default"
         variables:
-          TEST_TYPE: "minimal" 
+          TEST_TYPE: "minimal"
+        metadata:
+          deployment_target: "default" 

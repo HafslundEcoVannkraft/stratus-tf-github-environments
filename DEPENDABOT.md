@@ -1,6 +1,6 @@
 # Dependabot Configuration
 
-This document explains how Dependabot is configured in the `stratus-tf-aca-gh-vending` repository to automatically manage dependency updates.
+This document explains how Dependabot is configured in the `stratus-tf-github-environments` repository to automatically manage dependency updates.
 
 ## Overview
 
@@ -59,7 +59,7 @@ Dependabot monitors all workflow files in [`.github/workflows/`](.github/workflo
 - `welcome-contributors.yml`
 - `dependabot-auto-merge.yml`
 - `integration-test.yml`
-- `github-environment-aca.yml`
+- `github-environment-vending.yml`
 
 ### Grouping
 
@@ -221,4 +221,4 @@ To modify Dependabot behavior:
 
 ---
 
-> **Note**: This configuration prioritizes stability over bleeding-edge updates. Security patches are prioritized while feature updates require manual review to ensure compatibility with the Azure Container Apps landing zone architecture. 
+> **Note**: This configuration prioritizes stability over bleeding-edge updates. Security patches are prioritized while feature updates require manual review to ensure compatibility with the Stratus Azure Landing Zone architecture. 
