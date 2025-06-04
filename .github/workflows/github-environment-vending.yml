@@ -4,45 +4,45 @@ on:
   workflow_dispatch:
     inputs:
       github_env_file:
-        description: 'Filename of GitHub environment config (optional, defaults to github-environments.yaml)'
+        description: "Filename of GitHub environment config (optional, defaults to github-environments.yaml)"
         required: false
         type: string
-        default: 'github-environments.yaml'
+        default: "github-environments.yaml"
       tfvars_file:
-        description: 'Filename of tfvars file (required, will be searched for recursively in the repository)'
+        description: "Filename of tfvars file (required, will be searched for recursively in the repository)"
         required: true
         type: string
       github_token:
-        description: 'GitHub token with repo, workflow and read:org permissions (required)'
+        description: "GitHub token with repo, workflow and read:org permissions (required)"
         required: true
         type: string
       github_owner:
-        description: 'GitHub organization or user name (optional, defaults to HafslundEcoVannkraft)'
+        description: "GitHub organization or user name (optional, defaults to HafslundEcoVannkraft)"
         required: false
         type: string
-        default: 'HafslundEcoVannkraft'
+        default: "HafslundEcoVannkraft"
       iac_repo_ref:
-        description: 'Git reference (branch, tag, or commit SHA) of the IaC repository to checkout (optional, defaults to main)'
+        description: "Git reference (branch, tag, or commit SHA) of the IaC repository to checkout (optional, defaults to main)"
         required: false
         type: string
-        default: 'main'
+        default: "main"
       remote_state_config:
         description: 'Optional remote state override: rg=name,sa=name,container=name,key=name (e.g., "key=custom.tfstate" or "rg=custom-rg,key=custom.tfstate")'
         required: false
         type: string
       module_repo_ref:
-        description: 'Git reference (branch, tag, or commit SHA) of the module repository (optional, defaults to main)'
+        description: "Git reference (branch, tag, or commit SHA) of the module repository (optional, defaults to main)"
         required: false
         type: string
-        default: 'main'
+        default: "main"
       operation:
-        description: 'Operation to perform (apply or destroy)'
+        description: "Operation to perform (apply or destroy)"
         required: false
         type: choice
         options:
           - apply
           - destroy
-        default: 'apply'
+        default: "apply"
 
 permissions:
   id-token: write
@@ -131,11 +131,11 @@ jobs:
             echo "github_env_file = \"$(basename "$ENV_FILE")\""
             echo "module_repo_ref = \"${{ github.event.inputs.module_repo_ref }}\""
             echo "iac_repo_url = \"${{ github.server_url }}/${{ github.repository }}\""
-            
+
             # Parse remote_state_config if provided (format: rg=name,sa=name,container=name,key=name)
             if [ -n "${{ github.event.inputs.remote_state_config }}" ]; then
               REMOTE_STATE_CONFIG="${{ github.event.inputs.remote_state_config }}"
-              
+
               # Parse each key=value pair
               IFS=',' read -ra PAIRS <<< "$REMOTE_STATE_CONFIG"
               for pair in "${PAIRS[@]}"; do
@@ -190,7 +190,7 @@ jobs:
       contents: read
       pull-requests: write
       id-token: write
-    uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_plan.yaml@feat/cache
+    uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_plan.yaml@main
     name: ${{ needs.prepare.outputs.environment }} Plan
     with:
       path: ${{ needs.prepare.outputs.tf_workspace }}
@@ -212,7 +212,7 @@ jobs:
       contents: read
       pull-requests: write
       id-token: write
-    uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_apply.yaml@feat/cache
+    uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_apply.yaml@main
     name: ${{ needs.prepare.outputs.environment }} Apply
     with:
       path: ${{ needs.prepare.outputs.tf_workspace }}
