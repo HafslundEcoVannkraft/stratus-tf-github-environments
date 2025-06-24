@@ -30,14 +30,14 @@ repositories:
 
       # Edge case test - maximum wait timer
       - name: "max-wait-test"
-        wait_timer: 43200 # 12 hours - maximum allowed
+        wait_timer: 720 # 12 hours - maximum allowed
         prevent_self_review: true
         reviewers:
           teams:
             - name: "stratus-az-platform-approvers"
         variables:
           TEST_TYPE: "max-wait"
-          WAIT_TIMER: "43200"
+          WAIT_TIMER: "720"
           EDGE_CASE: "true"
         metadata:
           deployment_target: "default"

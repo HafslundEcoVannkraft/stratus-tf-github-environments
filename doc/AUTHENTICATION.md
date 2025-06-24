@@ -3,7 +3,8 @@
 This is the **comprehensive authentication guide** for the `stratus-tf-github-environments` module. This guide covers all authentication methods, security considerations, and troubleshooting.
 
 > **📚 Related Documentation:**
-> - [README.md](./README.md) - Quick setup and usage examples
+>
+> - [README.md](../README.md) - Quick setup and usage examples
 > - [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - Common issues and solutions
 > - [AI_CONTEXT.md](./AI_CONTEXT.md) - Context for AI-assisted development
 
@@ -27,6 +28,7 @@ GitHub CLI authentication is the **recommended approach** for security, convenie
 ### **🎯 Stratus Default: GitHub CLI Tokens (Recommended)**
 
 **For most Stratus teams, use GitHub CLI tokens because:**
+
 - **One-time setup**: Configuring GitHub environments is typically a one-time task per project
 - **No approval overhead**: GitHub Apps require manual workflow to order app and private key from administrators
 - **Immediate access**: `gh auth login` and you're ready to go
@@ -35,6 +37,7 @@ GitHub CLI authentication is the **recommended approach** for security, convenie
 ### **🏢 GitHub Apps: For Special Requirements**
 
 **Consider GitHub Apps only if your team:**
+
 - **Creates/destroys environments frequently** (multiple times per week)
 - **Has specific compliance requirements** for app-based authentication
 - **Already has GitHub Apps** set up for other purposes
@@ -210,6 +213,7 @@ gh api orgs/your-organization
 ### **Common Issues**
 
 #### **"Not logged in" Error**
+
 ```bash
 # Check status
 gh auth status
@@ -220,6 +224,7 @@ gh auth login
 ```
 
 #### **"Resource not accessible" Error**
+
 ```bash
 # Check organization membership
 gh api orgs/your-organization/members/your-username
@@ -233,6 +238,7 @@ gh auth login
 ```
 
 #### **Token Scope Issues**
+
 ```bash
 # GitHub CLI tokens have automatic scopes
 # If you see scope errors, re-authenticate:
@@ -341,6 +347,7 @@ For enterprise environments and automated testing, GitHub App authentication pro
 #### **2. Set Permissions**
 
 **Repository permissions:**
+
 - **Actions**: Write (to dispatch workflows)
 - **Contents**: Read (to read repository files)
 - **Environments**: Write (to create and manage environments)
@@ -349,6 +356,7 @@ For enterprise environments and automated testing, GitHub App authentication pro
 - **Variables**: Write (to manage environment variables)
 
 **Organization permissions:**
+
 - **Administration**: Read (to validate team and user assignments)
 
 #### **3. Generate Private Key**
@@ -455,18 +463,21 @@ The enhanced integration test now provides:
 ### **Security Considerations**
 
 #### **Private Key Management**
+
 - **🔒 Never commit private keys** to repositories
 - **🏦 Use secure storage** (Azure Key Vault, GitHub Secrets, etc.)
 - **🔄 Rotate keys regularly** following security policies
 - **👥 Limit access** to private keys
 
 #### **Installation Security**
+
 - **🎯 Limit repository access** to only required repositories
 - **👀 Monitor app usage** through GitHub's audit logs
 - **🔍 Regular permission reviews** to ensure least privilege
 - **🚨 Immediate revocation** if compromise is suspected
 
 #### **Token Handling**
+
 - **⏰ Short-lived tokens**: Installation tokens expire in 1 hour
 - **🔐 Secure transmission**: Use HTTPS and secure environment variables
 - **📝 Audit logging**: All API calls are logged under the app's identity

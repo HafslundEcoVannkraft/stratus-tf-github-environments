@@ -2,7 +2,7 @@
 
 [![Terraform Validation](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/actions/workflows/pr-validation.yml)
 [![Dependabot Auto-Merge](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/actions/workflows/dependabot-auto-merge.yml/badge.svg)](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/actions/workflows/dependabot-auto-merge.yml)
-[![Community Friendly](https://img.shields.io/badge/Community-Friendly-brightgreen?style=flat&logo=github)](./CONTRIBUTING.md)
+[![Community Friendly](https://img.shields.io/badge/Community-Friendly-brightgreen?style=flat&logo=github)](./doc/CONTRIBUTING.md)
 
 > **Note:** This module is specifically tailored for developer teams building on the Stratus Azure Landing Zone architecture. It is optimized for the IaC Repositories created for each new system or team starting their journey in Stratus. Some input variables and design choices are opinionated for this workflow. **This module may not be the optimal choice for other use cases or non-Stratus environments.**
 
@@ -222,7 +222,7 @@ flowchart LR
       - [**3. GitHub API Validation**](#3-github-api-validation)
       - [**4. Azure Prerequisites Validation**](#4-azure-prerequisites-validation)
     - [Common Validation Errors](#common-validation-errors)
-      - [**Invalid deployment_target**](#invalid-deployment_target)
+      - [**Invalid deployment\_target**](#invalid-deployment_target)
       - [**Remote state access error**](#remote-state-access-error)
       - [**Duplicate environments**](#duplicate-environments)
     - [Validation Outputs](#validation-outputs)
@@ -1067,7 +1067,7 @@ For comprehensive troubleshooting, see our [Troubleshooting Guide](./TROUBLESHOO
 - ✨ **Add features** - Check our [good first issues](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 - 🧪 **Test examples** - Try our configurations and share feedback
 
-**New to open source?** Perfect! Check our [Contributing Guide](./CONTRIBUTING.md) for a gentle introduction.
+**New to open source?** Perfect! Check our [Contributing Guide](./doc/CONTRIBUTING.md) for a gentle introduction.
 
 ---
 
