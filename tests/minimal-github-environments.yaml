@@ -1,9 +1,9 @@
 repositories:
-  - repo: "stratus-tf-aca-gh-vending"
+  - repo: "stratus-tf-github-environments"
     environments:
       # Minimal test environment - only required fields
       - name: "minimal-test"
         variables:
           TEST_TYPE: "minimal"
         metadata:
-          deployment_target: "default" 
+          deployment_target: "default"

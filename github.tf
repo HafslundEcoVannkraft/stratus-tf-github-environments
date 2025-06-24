@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 # github.tf
-# GitHub resources for the stratus-tf-aca-gh-vending module.
+# GitHub resources for the stratus-tf-github-environments module.
 # Manages environments, deployment policies, variables, and secrets.
 # Enhanced with retry logic and better error handling.
 # -----------------------------------------------------------------------------

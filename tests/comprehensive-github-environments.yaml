@@ -1,5 +1,5 @@
 repositories:
-  - repo: "stratus-tf-aca-gh-vending"
+  - repo: "stratus-tf-github-environments"
     environments:
       # Comprehensive test environment - all features enabled
       - name: "comprehensive-test"
@@ -18,7 +18,7 @@ repositories:
           DEPLOYMENT_MODE: "complete"
         secrets:
           TEST_SECRET:
-            key_vault: "stratus-tf-aca-gh-vending-kv"
+            key_vault: "stratus-tf-github-environments-kv"
             secret_ref: "comprehensive"
         deployment_branch_policy:
           protected_branches: false

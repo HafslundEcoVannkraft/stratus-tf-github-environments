@@ -7,17 +7,20 @@ The integration test workflow uses GitHub environments to simplify Azure federat
 ## 🎯 **Benefits of GitHub Environments**
 
 ### **🔐 Enhanced Security**
+
 - **Environment-specific credentials**: Separate federated credentials per environment
 - **Access control**: Restrict who can run integration tests
 - **Approval workflows**: Optional manual approval for sensitive operations
 - **Audit trail**: Better tracking of environment-specific deployments
 
 ### **🔧 Simplified Configuration**
+
 - **Specific subject claims**: More precise federated credential targeting
 - **Environment variables**: Centralized configuration per environment
 - **Protection rules**: Built-in safeguards for production environments
 
 ### **📊 Better Organization**
+
 - **Clear separation**: Test vs production credentials
 - **Environment history**: Track deployments per environment
 - **Status visibility**: See environment-specific deployment status
@@ -48,6 +51,7 @@ GH_APP_ID=your-github-app-id
 ### **3. Configure Azure Federated Credential**
 
 #### **Azure CLI Setup**
+
 ```bash
 # Set variables
 APP_ID="your-service-principal-app-id"
@@ -59,15 +63,16 @@ ENVIRONMENT_NAME="integration-test"
 az ad app federated-credential create \
   --id $APP_ID \
   --parameters '{
-    "name": "stratus-tf-aca-gh-vending-integration-test",
+    "name": "stratus-tf-github-environments-integration-test",
     "issuer": "https://token.actions.githubusercontent.com",
     "subject": "repo:'$REPO_OWNER'/'$REPO_NAME':environment:'$ENVIRONMENT_NAME'",
-    "description": "GitHub Actions integration test environment for stratus-tf-aca-gh-vending",
+    "description": "GitHub Actions integration test environment for stratus-tf-github-environments",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 ```
 
 #### **Azure Portal Setup**
+
 1. Go to **Azure Active Directory** → **App registrations**
 2. Select your service principal
 3. Go to **Certificates & secrets** → **Federated credentials**
@@ -83,21 +88,25 @@ az ad app federated-credential create \
 ## 🔍 **Federated Credential Subject Claims**
 
 ### **Environment-Specific Subject**
+
 ```
 repo:HafslundEcoVannkraft/stratus-tf-github-environments:environment:integration-test
 ```
 
 **Benefits:**
+
 - ✅ **Precise targeting**: Only the integration-test environment can use this credential
 - ✅ **Security isolation**: Other workflows cannot access these credentials
 - ✅ **Clear audit trail**: All token requests are tied to the specific environment
 
 ### **Comparison with Repository-Wide Subject**
+
 ```
 repo:HafslundEcoVannkraft/stratus-tf-github-environments:ref:refs/heads/main
 ```
 
 **Limitations:**
+
 - ❌ **Broad access**: Any workflow on main branch can use the credential
 - ❌ **Less granular**: Cannot distinguish between different types of operations
 - ❌ **Security risk**: Accidental credential usage in other workflows
@@ -105,11 +114,12 @@ repo:HafslundEcoVannkraft/stratus-tf-github-environments:ref:refs/heads/main
 ## 🚀 **Workflow Integration**
 
 ### **Job Configuration**
+
 ```yaml
 test-sequential:
   name: Test ${{ matrix.github_env_file }}
   runs-on: ubuntu-latest
-  environment: integration-test  # 🔑 Key configuration
+  environment: integration-test # 🔑 Key configuration
   env:
     ARM_USE_OIDC: true
     ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
@@ -118,7 +128,9 @@ test-sequential:
 ```
 
 ### **Automatic Token Exchange**
+
 When the job runs:
+
 1. **GitHub generates OIDC token** with environment-specific subject claim
 2. **Azure validates the token** against the federated credential
 3. **Azure issues access token** for the service principal
@@ -127,17 +139,19 @@ When the job runs:
 ## 🔒 **Security Best Practices**
 
 ### **Environment Protection Rules**
+
 ```yaml
 # Recommended protection rules for integration-test environment
 protection_rules:
-  - required_reviewers: 1        # Require manual approval
-  - wait_timer: 0               # No delay for integration tests
-  - deployment_branches:        # Restrict to specific branches
-    - main
-    - develop
+  - required_reviewers: 1 # Require manual approval
+  - wait_timer: 0 # No delay for integration tests
+  - deployment_branches: # Restrict to specific branches
+      - main
+      - develop
 ```
 
 ### **Principle of Least Privilege**
+
 - **Service Principal Roles**:
   - `Contributor` (on test resource groups only)
   - `Storage Blob Data Contributor` (on test storage accounts only)
@@ -146,6 +160,7 @@ protection_rules:
   - Regular access reviews
 
 ### **Credential Rotation**
+
 ```bash
 # Rotate federated credentials periodically
 az ad app federated-credential delete --id $APP_ID --federated-credential-id $CRED_ID
@@ -155,6 +170,7 @@ az ad app federated-credential create --id $APP_ID --parameters @new-credential.
 ## 🧪 **Testing the Configuration**
 
 ### **Verify Environment Setup**
+
 ```bash
 # Check environment configuration
 gh api repos/HafslundEcoVannkraft/stratus-tf-github-environments/environments/integration-test
@@ -164,6 +180,7 @@ gh api repos/HafslundEcoVannkraft/stratus-tf-github-environments/environments/in
 ```
 
 ### **Test Federated Credential**
+
 ```bash
 # Trigger integration test workflow
 gh workflow run integration-test.yml
@@ -174,7 +191,9 @@ gh run view --log
 ```
 
 ### **Verify Azure Token Exchange**
+
 Check the workflow logs for successful Azure login:
+
 ```
 ✅ Azure OIDC authentication configured:
   - Client ID: 12345678-1234-1234-1234-123456789012
@@ -187,28 +206,36 @@ Check the workflow logs for successful Azure login:
 ### **Common Issues**
 
 #### **Federated Credential Not Found**
+
 ```
 Error: AADSTS70021: No matching federated identity record found
 ```
+
 **Solution**: Verify the subject claim matches exactly:
+
 ```bash
 # Check the subject claim in your federated credential
 az ad app federated-credential list --id $APP_ID --query "[].subject"
 ```
 
 #### **Environment Not Found**
+
 ```
 Error: Environment 'integration-test' not found
 ```
+
 **Solution**: Create the environment in GitHub repository settings.
 
 #### **Missing Environment Variables**
+
 ```
 Error: Missing required Azure authentication environment variables
 ```
+
 **Solution**: Add variables to the GitHub environment (not repository variables).
 
 ### **Debug Commands**
+
 ```bash
 # List all federated credentials
 az ad app federated-credential list --id $APP_ID
@@ -228,4 +255,4 @@ gh run view RUN_ID --log
 
 ---
 
-**💡 Pro Tip**: Use different environments (`integration-test`, `staging`, `production`) with separate federated credentials for complete isolation and security. 
+**💡 Pro Tip**: Use different environments (`integration-test`, `staging`, `production`) with separate federated credentials for complete isolation and security.

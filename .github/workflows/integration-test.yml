@@ -8,7 +8,7 @@ name: Integration Tests
 # GitHub Environment Configuration:
 # - The test-sequential job runs in the "integration-test" environment
 # - This simplifies federated credential configuration in Azure AD
-# - Federated credential subject: repo:HafslundEcoVannkraft/stratus-tf-aca-gh-vending:environment:integration-test
+# - Federated credential subject: repo:HafslundEcoVannkraft/stratus-tf-github-environments:environment:integration-test
 #
 # Required GitHub repository variables:
 # - AZURE_CLIENT_ID: The client ID of the Azure AD application/service principal
@@ -26,23 +26,23 @@ name: Integration Tests
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - '*.tf'
-      - 'tests/**'
-      - '.github/workflows/integration-test.yml'
-      - '.github/workflows/github-environment-aca.yml'
+      - "*.tf"
+      - "tests/**"
+      - ".github/workflows/integration-test.yml"
+      - ".github/workflows/github-environment-aca.yml"
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - '*.tf'
-      - 'tests/**'
-      - '.github/workflows/integration-test.yml'
-      - '.github/workflows/github-environment-aca.yml'
+      - "*.tf"
+      - "tests/**"
+      - ".github/workflows/integration-test.yml"
+      - ".github/workflows/github-environment-aca.yml"
   workflow_dispatch:
     inputs:
       destroy_after_test:
-        description: 'Destroy resources after test'
+        description: "Destroy resources after test"
         required: false
         default: true
         type: boolean
@@ -278,7 +278,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.prepare.outputs.matrix) }}
       fail-fast: false
-      max-parallel: 1  # Ensure sequential processing
+      max-parallel: 1 # Ensure sequential processing
     steps:
       - name: Checkout
         uses: actions/checkout@v4

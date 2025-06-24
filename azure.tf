@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 # azure.tf
-# Azure resources for the stratus-tf-aca-gh-vending module.
+# Azure resources for the stratus-tf-github-environments module.
 # Handles resource group creation, managed identities, federated credentials,
 # role assignments, validation, and random naming.
 # -----------------------------------------------------------------------------

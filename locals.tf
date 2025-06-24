@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 # locals.tf
-# Local values and data sources for the stratus-tf-aca-gh-vending module.
+# Local values and data sources for the stratus-tf-github-environments module.
 # Handles YAML parsing, environment processing, remote state access,
 # role assignments, and GitHub API data lookups.
 # -----------------------------------------------------------------------------

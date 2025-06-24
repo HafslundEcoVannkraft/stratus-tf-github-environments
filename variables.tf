@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 # variables.tf
-# Input variables for the stratus-tf-aca-gh-vending module.
+# Input variables for the stratus-tf-github-environments module.
 # Configure Azure, GitHub, and module-specific settings here.
 # -----------------------------------------------------------------------------
 variable "subscription_id" {
