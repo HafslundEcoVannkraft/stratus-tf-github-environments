@@ -160,7 +160,7 @@ jobs:
 
       # We only need terrform for formatting, not for plan or apply
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3.1.2
+        uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Format
         id: fmt
@@ -190,7 +190,7 @@ jobs:
       contents: read
       pull-requests: write
       id-token: write
-    uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_plan.yaml@main
+    uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_plan.yaml@v2
     name: ${{ needs.prepare.outputs.environment }} Plan
     with:
       path: ${{ needs.prepare.outputs.tf_workspace }}
@@ -212,7 +212,7 @@ jobs:
       contents: read
       pull-requests: write
       id-token: write
-    uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_apply.yaml@main
+    uses: HafslundEcoVannkraft/stratus-lz-workflows/.github/workflows/lz_tf_apply.yaml@v2
     name: ${{ needs.prepare.outputs.environment }} Apply
     with:
       path: ${{ needs.prepare.outputs.tf_workspace }}

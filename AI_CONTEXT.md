@@ -1,8 +1,5 @@
 # AI Context for stratus-tf-github-environments
 
-> **🚧 WORK IN PROGRESS** 🚧
-> This project is currently under active development. Features, APIs, and documentation may change without notice.
-
 This document provides essential context for AI assistants working on the `stratus-tf-github-environments` project. It helps maintain consistency across AI sessions and ensures new AI interactions understand the project's purpose, architecture, and constraints.
 
 ## 🎯 Project Overview
@@ -11,9 +8,9 @@ This document provides essential context for AI assistants working on the `strat
 This Terraform module automates the creation of GitHub deployment environments for Azure infrastructure within the **Stratus Corp Azure Landing Zone** architecture. It establishes secure OIDC federation between GitHub Actions and Azure, eliminating the need for static credentials.
 
 ### Key Value Proposition
-- **Generic Infrastructure Support**: Works with any Azure infrastructure (Container Apps, AKS, VMs, Functions, etc.)
+- **Generic Infrastructure Support**: Works with any Azure infrastructure (Container Apps, AKS, Functions, etc.)
 - **Secure Authentication**: OIDC federation replaces static secrets
-- **Centralized Management**: IaC repository controls all environment creation
+- **Centralized Management**: IaC repository controls all environment creation, the IaC repo allready have the required Identity and role assignment to create new identities.
 - **Dynamic Role Assignment**: Convention-based role mapping for infinite flexibility
 - **Enterprise Ready**: Designed for corporate environments with strict security requirements
 

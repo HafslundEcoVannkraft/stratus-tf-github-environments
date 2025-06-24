@@ -1,8 +1,5 @@
 # 🤝 **Contributing to stratus-tf-aca-gh-vending**
 
-> **🚧 WORK IN PROGRESS** 🚧  
-> This project is currently under active development. Contribution guidelines and processes may evolve as the project matures.
-
 Welcome! We're excited that you want to contribute to the **stratus-tf-aca-gh-vending** project. This guide will help you get started with contributing effectively.
 
 Thank you for your interest in contributing! 🎉 This project welcomes contributions from everyone.
@@ -16,7 +13,7 @@ Thank you for your interest in contributing! 🎉 This project welcomes contribu
 
 ### **For Larger Changes**
 1. **Open an issue first** to discuss your idea
-2. **Fork** the repository  
+2. **Fork** the repository
 3. **Create a branch**: `git checkout -b your-feature-name`
 4. **Make your changes**
 5. **Test locally** (see below)
@@ -60,7 +57,7 @@ We prefer descriptive commit messages, but don't stress about the format. Exampl
 ## 🎯 **What We're Looking For**
 
 - **Bug fixes** of any size
-- **Documentation improvements** 
+- **Documentation improvements**
 - **Example updates**
 - **New features** (please discuss first)
 - **Typo fixes** (seriously, these help!)
@@ -79,7 +76,7 @@ We prefer descriptive commit messages, but don't stress about the format. Exampl
 
 For major features or complex bug fixes, you'll need:
 
-- **Terraform** >= 1.3.0
+- **Terraform** >= 1.9.0
 - **GitHub CLI** (for testing workflows)
 - **Azure CLI** (for testing Azure integration)
 - Access to a test Azure subscription
@@ -143,4 +140,4 @@ The AI context file provides comprehensive background that helps AI assistants u
 
 ---
 
-**Remember**: Every contribution matters, no matter how small. Thank you for helping make this project better! ✨ 
+**Remember**: Every contribution matters, no matter how small. Thank you for helping make this project better! ✨

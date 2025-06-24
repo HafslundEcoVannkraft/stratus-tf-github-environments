@@ -79,12 +79,25 @@ data "azurerm_key_vault_secret" "remote_state_secrets" {
 
 locals {
   github_env_file = var.github_env_file
-  yaml_content    = fileexists(local.github_env_file) ? file(local.github_env_file) : file("${path.module}/examples/minimal.yaml")
+  yaml_content    = fileexists(local.github_env_file) ? file(local.github_env_file) : file("${path.module}/deployments/github/github-environments.yaml")
   config          = yamldecode(local.yaml_content)
   repositories    = local.config.repositories
 
   remote_state_outputs      = try(data.terraform_remote_state.infrastructure.outputs, {})
   github_environment_config = try(local.remote_state_outputs.github_environments, [])
+
+  naming = {
+    prefix                  = "${var.code_name}-${var.environment}"
+    suffix                  = var.resource_group_suffix != null ? var.resource_group_suffix : random_string.name_suffix.result
+    resource_group_name     = "${var.code_name}-github-identities-rg-${var.environment}-${var.resource_group_suffix != null ? var.resource_group_suffix : random_string.name_suffix.result}"
+    managed_identity_prefix = "${var.code_name}-id-github"
+  }
+  common_tags = merge(var.tags, {
+    Environment = var.environment
+    CodeName    = var.code_name
+    ManagedBy   = "terraform"
+    Module      = "stratus-tf-github-environments"
+  })
 
   # Flatten environments
   environments = flatten([
@@ -187,22 +200,6 @@ locals {
   ])
   role_assignments_map = { for assignment in local.environment_role_assignments : assignment.key => assignment }
 
-  # Legacy remote state references - these can be accessed directly from remote_state_outputs if needed
-  # Removed hardcoded references to make module generic
-
-  naming = {
-    prefix                  = "${var.code_name}-${var.environment}"
-    suffix                  = var.resource_group_suffix != null ? var.resource_group_suffix : random_string.name_suffix.result
-    resource_group_name     = "${var.code_name}-rg-${var.environment}-github-identities-${var.resource_group_suffix != null ? var.resource_group_suffix : random_string.name_suffix.result}"
-    managed_identity_prefix = "${var.code_name}-id-github"
-  }
-  common_tags = merge(var.tags, {
-    Environment    = var.environment
-    CodeName       = var.code_name
-    ManagedBy      = "terraform"
-    Module         = "stratus-tf-aca-gh-vending"
-    DeploymentDate = timestamp()
-  })
 
   # Simple validation for outputs (detailed validation is in validation.tf)
   no_duplicate_environments = length([
