@@ -27,7 +27,7 @@ repositories:
           LOG_LEVEL: "debug"
           FEATURE_FLAGS: "experimental"
         metadata:
-          deployment_target: ace1 # Maps to "ace1" key in remote state environments metadata
+          deployment_target: cae1 # Maps to "cae1" key in remote state environments metadata
 
       - name: dev-cd
         wait_timer: 5 # Brief wait to prevent accidental deployments
@@ -42,7 +42,7 @@ repositories:
           custom_branch_policies: true
           branch_pattern: ["main", "develop", "feature/*"] # Allow feature branches
         metadata:
-          deployment_target: ace1 # Same Azure environment, different protections
+          deployment_target: cae1 # Same Azure environment, different protections
 
       # Staging: Enhanced protections with shared Azure environment
       - name: staging-ci
@@ -243,7 +243,6 @@ repositories:
           BUILD_ENV: "production"
         # No metadata - this is a generic GitHub environment
         # It will still get Azure managed identity but no deployment-specific configuration
-
 # Configuration Notes:
 #
 # 1. Metadata Structure:
