@@ -254,5 +254,9 @@ PRDETAILS.md
 # Include specific documentation
 !docs/README.md
 
+# Ignore files often genereated or used by AI tools
+git.diff
+PR.md
+
 
 
