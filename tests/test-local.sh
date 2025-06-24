@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Local Testing Script for stratus-tf-aca-gh-vending
+# Local Testing Script for stratus-tf-github-environments
 # This script validates the module configuration without deploying resources
 
 set -e
@@ -45,7 +45,7 @@ if [[ ! -f "variables.tf" ]] || [[ ! -f "outputs.tf" ]] || [[ ! -f "locals.tf" ]
     exit 1
 fi
 
-print_header "🧪 Local Testing for stratus-tf-aca-gh-vending"
+print_header "🧪 Local Testing for stratus-tf-github-environments"
 
 # Check prerequisites
 print_header "📋 Checking Prerequisites"

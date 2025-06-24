@@ -1,22 +1,21 @@
-# 🤝 **Contributing to stratus-tf-aca-gh-vending**
+# 🤝 **Contributing to stratus-tf-github-environments**
 
-> **🚧 WORK IN PROGRESS** 🚧  
-> This project is currently under active development. Contribution guidelines and processes may evolve as the project matures.
-
-Welcome! We're excited that you want to contribute to the **stratus-tf-aca-gh-vending** project. This guide will help you get started with contributing effectively.
+Welcome! We're excited that you want to contribute to the **stratus-tf-github-environments** project. This guide will help you get started with contributing effectively.
 
 Thank you for your interest in contributing! 🎉 This project welcomes contributions from everyone.
 
 ## 🚀 **Quick Start**
 
 ### **For Small Changes** (typos, docs, small fixes)
+
 1. **Fork** the repository
 2. **Make your changes** directly on GitHub or locally
 3. **Submit a pull request** - that's it!
 
 ### **For Larger Changes**
+
 1. **Open an issue first** to discuss your idea
-2. **Fork** the repository  
+2. **Fork** the repository
 3. **Create a branch**: `git checkout -b your-feature-name`
 4. **Make your changes**
 5. **Test locally** (see below)
@@ -40,6 +39,7 @@ That's it! Our automated checks will handle the rest.
 ## 📝 **Commit Messages**
 
 We prefer descriptive commit messages, but don't stress about the format. Examples:
+
 - `Fix typo in README`
 - `Add validation for new variable`
 - `Update example configuration`
@@ -60,7 +60,7 @@ We prefer descriptive commit messages, but don't stress about the format. Exampl
 ## 🎯 **What We're Looking For**
 
 - **Bug fixes** of any size
-- **Documentation improvements** 
+- **Documentation improvements**
 - **Example updates**
 - **New features** (please discuss first)
 - **Typo fixes** (seriously, these help!)
@@ -79,7 +79,7 @@ We prefer descriptive commit messages, but don't stress about the format. Exampl
 
 For major features or complex bug fixes, you'll need:
 
-- **Terraform** >= 1.3.0
+- **Terraform** >= 1.9.0
 - **GitHub CLI** (for testing workflows)
 - **Azure CLI** (for testing Azure integration)
 - Access to a test Azure subscription
@@ -94,6 +94,7 @@ git checkout -b feature/your-feature-name
 ```
 
 **Branch naming conventions**:
+
 - `feature/` - New features
 - `fix/` - Bug fixes
 - `docs/` - Documentation updates
@@ -113,6 +114,7 @@ terraform plan -var-file=test/test.tfvars
 ### **Documentation Updates**
 
 When adding features:
+
 - Update README if adding new functionality
 - Update examples if changing configuration
 - Update variable documentation
@@ -120,6 +122,7 @@ When adding features:
 ### **Conventional Commits** (optional but appreciated)
 
 For better change tracking:
+
 ```bash
 git commit -m "feat(validation): add Azure naming constraint validation"
 git commit -m "fix(github): resolve API rate limiting issues"
@@ -143,4 +146,4 @@ The AI context file provides comprehensive background that helps AI assistants u
 
 ---
 
-**Remember**: Every contribution matters, no matter how small. Thank you for helping make this project better! ✨ 
+**Remember**: Every contribution matters, no matter how small. Thank you for helping make this project better! ✨

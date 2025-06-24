@@ -134,7 +134,7 @@ locals {
 
 #       ${join("\n", nonsensitive(local.validation_error_report))}
 
-#       For more help, see: https://github.com/HafslundEcoVannkraft/stratus-tf-aca-gh-vending/blob/main/README.md#troubleshooting
+#       For more help, see: https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/blob/main/README.md#troubleshooting
 #     EOT
 #   }
 # }

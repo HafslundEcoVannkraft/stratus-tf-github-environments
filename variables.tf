@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 # variables.tf
-# Input variables for the stratus-tf-aca-gh-vending module.
+# Input variables for the stratus-tf-github-environments module.
 # Configure Azure, GitHub, and module-specific settings here.
 # -----------------------------------------------------------------------------
 variable "subscription_id" {
@@ -158,17 +158,6 @@ variable "resource_group_suffix" {
   description = "Optional: Suffix for the resource group name. Must be <= 10 lowercase alphanumeric characters."
   type        = string
   default     = null
-
-  # validation {
-  #   condition = (
-  #     var.resource_group_suffix == null ||
-  #     (
-  #       length(var.resource_group_suffix) <= 10 &&
-  #       can(regex("^[a-z0-9]+$", var.resource_group_suffix))
-  #     )
-  #   )
-  #   error_message = "If provided, resource_group_suffix must be <= 10 lowercase alphanumeric characters."
-  # }
 }
 
 variable "module_repo_ref" {

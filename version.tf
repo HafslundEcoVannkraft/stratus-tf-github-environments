@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 # version.tf
-# Terraform version and provider requirements for the stratus-tf-aca-gh-vending module.
+# Terraform version and provider requirements for the stratus-tf-github-environments module.
 # -----------------------------------------------------------------------------
 
 terraform {

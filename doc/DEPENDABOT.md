@@ -5,19 +5,20 @@ This document explains how Dependabot is configured in the `stratus-tf-github-en
 ## Overview
 
 Dependabot is configured to monitor and automatically update three types of dependencies:
+
 - **Terraform providers** (primary focus)
-- **GitHub Actions** 
+- **GitHub Actions**
 - **NPM packages** (if present)
 
 All configuration is defined in [`.github/dependabot.yml`](.github/dependabot.yml).
 
 ## Update Schedule
 
-| Ecosystem | Schedule | Time (Europe/Oslo) | Max PRs |
-|-----------|----------|-------------------|---------|
-| Terraform | Weekly (Monday) | 09:00 | 5 |
-| GitHub Actions | Weekly (Monday) | 10:00 | 3 |
-| NPM | Monthly (1st Monday) | 11:00 | 2 |
+| Ecosystem      | Schedule             | Time (Europe/Oslo) | Max PRs |
+| -------------- | -------------------- | ------------------ | ------- |
+| Terraform      | Weekly (Monday)      | 09:00              | 5       |
+| GitHub Actions | Weekly (Monday)      | 10:00              | 3       |
+| NPM            | Monthly (1st Monday) | 11:00              | 2       |
 
 ## Terraform Provider Updates
 
@@ -27,7 +28,7 @@ Dependabot tracks all providers defined in [`version.tf`](version.tf):
 
 ```hcl
 azurerm = "~> 4.0"           # Azure Resource Manager
-azapi = "~> 2.4.0"           # Azure API Management  
+azapi = "~> 2.4.0"           # Azure API Management
 github = "~> 6.6.0"          # GitHub provider
 random = "~> 3.5.1"          # Random provider
 null = "~> 3.2.1"            # Null provider
@@ -55,7 +56,7 @@ Related providers are grouped together to reduce PR noise:
 Dependabot monitors all workflow files in [`.github/workflows/`](.github/workflows/):
 
 - `commit-validation-flexible.yml`
-- `pr-validation.yml` 
+- `pr-validation.yml`
 - `welcome-contributors.yml`
 - `dependabot-auto-merge.yml`
 - `integration-test.yml`
@@ -64,6 +65,7 @@ Dependabot monitors all workflow files in [`.github/workflows/`](.github/workflo
 ### Grouping
 
 All GitHub Actions are grouped together:
+
 - `actions/*` (official GitHub actions)
 - `hashicorp/setup-terraform`
 
@@ -74,11 +76,13 @@ All GitHub Actions are grouped together:
 Dependabot PRs are **automatically merged** if they meet these criteria:
 
 ✅ **Safe Updates** (auto-merged):
+
 - Patch version updates (e.g., `4.8.1` → `4.8.2`)
 - Security updates
 - GitHub Actions updates
 
 ✅ **Validation Passes**:
+
 - Terraform format check
 - Terraform validation
 - Example YAML file validation
@@ -87,6 +91,7 @@ Dependabot PRs are **automatically merged** if they meet these criteria:
 ### Manual Review Required
 
 🔍 **Manual review needed** for:
+
 - Major version updates (e.g., `4.x` → `5.x`)
 - Minor version updates with potential breaking changes
 - Failed validation tests
@@ -106,12 +111,14 @@ This conservative approach ensures stability and prevents unexpected breaking ch
 ### Automatic Assignment
 
 All Dependabot PRs are automatically:
+
 - **Assigned to**: `HafslundEcoVannkraft/stratus-az-platform-approvers`
 - **Reviewed by**: `HafslundEcoVannkraft/stratus-az-platform-approvers`
 
 ### Labels
 
 Each PR receives appropriate labels:
+
 - `dependencies` (all PRs)
 - `terraform` | `github-actions` | `npm` (ecosystem-specific)
 - `automated` (indicates Dependabot origin)
@@ -129,14 +136,18 @@ npm: update @types/node to v20.1.0
 ## 🔧 Configuration Files
 
 ### `.github/dependabot.yml`
+
 Main configuration file defining:
+
 - Update schedules
 - Package ecosystems
 - Grouping rules
 - Auto-merge policies
 
 ### `.github/workflows/dependabot-auto-merge.yml`
+
 Workflow that handles:
+
 - Terraform validation
 - Example file testing
 - Auto-approval and merge
@@ -147,37 +158,47 @@ Workflow that handles:
 ### Common Issues
 
 #### Validation Failures
+
 If Dependabot PRs fail validation:
+
 1. Check the workflow logs for specific errors
 2. Verify Terraform syntax and formatting
 3. Ensure example files are valid YAML
 4. Review for breaking changes in provider updates
 
 #### Auto-Merge Not Working
+
 Possible causes:
+
 1. Branch protection rules preventing auto-merge
 2. Required status checks not configured
 3. Insufficient permissions for GitHub token
 4. Manual review required due to major version update
 
 #### Too Many Open PRs
+
 If hitting PR limits:
+
 1. Review and merge pending PRs manually
 2. Adjust `open-pull-requests-limit` in `dependabot.yml`
 3. Consider more frequent update schedules
 
 #### Grouped Updates
+
 Related dependencies are bundled to reduce noise
 
 ### Manual Actions
 
 To manually trigger Dependabot:
+
 1. Go to the repository's **Insights** tab
 2. Click **Dependency graph** → **Dependabot**
 3. Click **Check for updates** on the desired ecosystem
 
 ### Manual Override
+
 To manually merge a Dependabot PR:
+
 ```bash
 # Approve the PR
 gh pr review <PR_NUMBER> --approve
@@ -217,8 +238,8 @@ To modify Dependabot behavior:
 - [GitHub Dependabot Documentation](https://docs.github.com/en/code-security/dependabot)
 - [Terraform Provider Versioning](https://developer.hashicorp.com/terraform/language/providers/requirements)
 - [GitHub Actions Versioning](https://docs.github.com/en/actions/creating-actions/about-custom-actions#using-release-management-for-actions)
-- [Repository Contributing Guidelines](CONTRIBUTING.md)
+- [Repository Contributing Guidelines](./CONTRIBUTING.md)
 
 ---
 
-> **Note**: This configuration prioritizes stability over bleeding-edge updates. Security patches are prioritized while feature updates require manual review to ensure compatibility with the Stratus Azure Landing Zone architecture. 
+> **Note**: This configuration prioritizes stability over bleeding-edge updates. Security patches are prioritized while feature updates require manual review to ensure compatibility with the Stratus Azure Landing Zone architecture.

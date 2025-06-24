@@ -1,5 +1,5 @@
 repositories:
-  - repo: "stratus-tf-aca-gh-vending"
+  - repo: "stratus-tf-github-environments"
     environments:
       # Comprehensive test environment - all features enabled
       - name: "comprehensive-test"
@@ -26,14 +26,14 @@ repositories:
 
       # Edge case test - maximum wait timer
       - name: "max-wait-test"
-        wait_timer: 43200 # 12 hours - maximum allowed
+        wait_timer: 720 # 12 hours - maximum allowed
         prevent_self_review: true
         reviewers:
           teams:
             - name: "stratus-az-platform-approvers"
         variables:
           TEST_TYPE: "max-wait"
-          WAIT_TIMER: "43200"
+          WAIT_TIMER: "720"
           EDGE_CASE: "true"
         metadata:
           deployment_target: "default"
@@ -103,14 +103,14 @@ repositories:
 
       # Test environment with maximum wait timer
       - name: "integration-test-max-wait"
-        wait_timer: 43200 # 12 hours - maximum allowed
+        wait_timer: 720 # 12 hours - maximum allowed
         prevent_self_review: true
         reviewers:
           teams:
             - name: "stratus-az-platform-approvers"
         variables:
           MAX_WAIT_TEST: "true"
-          WAIT_TIMER: "43200"
+          WAIT_TIMER: "720"
         metadata:
           deployment_target: "default"
 

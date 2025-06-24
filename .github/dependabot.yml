@@ -1,4 +1,4 @@
-# Dependabot configuration for stratus-tf-aca-gh-vending
+# Dependabot configuration for stratus-tf-github-environments
 # Automatically updates Terraform providers and GitHub Actions
 # See: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
@@ -106,4 +106,4 @@ updates:
       - "dependencies"
       - "npm"
       - "automated"
-    # Only if package.json exists for documentation or testing tools 
+    # Only if package.json exists for documentation or testing tools

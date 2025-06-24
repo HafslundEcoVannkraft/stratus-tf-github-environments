@@ -1,17 +1,84 @@
 # GitHub Environment Vending for Azure Infrastructure
 
-> **🚧 WORK IN PROGRESS** 🚧
-> This project is currently under active development. Features, APIs, and documentation may change without notice. Use at your own risk in production environments.
-
 [![Terraform Validation](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/actions/workflows/pr-validation.yml)
 [![Dependabot Auto-Merge](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/actions/workflows/dependabot-auto-merge.yml/badge.svg)](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/actions/workflows/dependabot-auto-merge.yml)
-[![Community Friendly](https://img.shields.io/badge/Community-Friendly-brightgreen?style=flat&logo=github)](./CONTRIBUTING.md)
-[![Good First Issues](https://img.shields.io/github/issues/HafslundEcoVannkraft/stratus-tf-github-environments/good%20first%20issue?color=7057ff&logo=github)](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-[![Work in Progress](https://img.shields.io/badge/Status-Work%20in%20Progress-yellow?style=flat&logo=github)](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments)
+[![Community Friendly](https://img.shields.io/badge/Community-Friendly-brightgreen?style=flat&logo=github)](./doc/CONTRIBUTING.md)
 
 > **Note:** This module is specifically tailored for developer teams building on the Stratus Azure Landing Zone architecture. It is optimized for the IaC Repositories created for each new system or team starting their journey in Stratus. Some input variables and design choices are opinionated for this workflow. **This module may not be the optimal choice for other use cases or non-Stratus environments.**
 
+## End-to-End Deployment Flow
+
+The Stratus platform provides a complete end-to-end workflow for deploying applications to Azure:
+
+```mermaid
+flowchart LR
+    subgraph "Step 1: Infrastructure Setup"
+        A[IaC Repository] -->|Deploy| B[Container App<br>Environment]
+        B -->|Creates| C[Azure Resources]
+        C -->|Outputs| D[Remote State]
+        style B fill:#f96,stroke:#333,stroke-width:2px
+    end
+
+    subgraph "Step 2: GitHub Environment Vending"
+        A -->|Run Workflow| E[GitHub Environment<br>Vending]
+        D -->|Configure| E
+        E -->|Setup| F[GitHub Environments]
+        E -->|Create| G[Managed Identities]
+        E -->|Configure| H[OIDC Federation]
+        style E fill:#3c3,stroke:#333,stroke-width:2px
+    end
+
+    subgraph "Step 3: Application Deployment"
+        I[Application Repository] -->|Use| F
+        I -->|Build & Push| J[Container Images]
+        I -->|Deploy App| K[Container Apps]
+        J -->|Run in| K
+        K -->|Hosted in| B
+        style K fill:#69f,stroke:#333,stroke-width:2px
+    end
+
+    D -.->|Powers| E
+    F -.->|Enables| I
+```
+
+### Three-Step Deployment Process
+
+1. **Step 1: Infrastructure Setup**
+
+   - Deploy Azure Container App Environment using Terraform
+   - Set up networking, identity, observability, and more
+   - Create shared infrastructure for multiple applications
+   - [📚 Infrastructure Setup Documentation](https://github.com/HafslundEcoVannkraft/stratus-tf-examples/blob/main/examples/corp/container_app_environment/README.md)
+
+2. **Step 2: GitHub Environment Vending (You are here)**
+
+   - Connect GitHub repositories to Azure infrastructure
+   - Configure secure authentication with OIDC
+   - Set up CI/CD environments with proper permissions
+   - [📚 GitHub Environment Vending Documentation](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/blob/main/README.md)
+
+3. **Step 3: Application Deployment**
+   - Build and push container images
+   - Deploy Container Apps using YAML configuration
+   - CI/CD workflows handle the deployment process
+   - [📚 Container App Deployment Documentation](https://github.com/HafslundEcoVannkraft/stratus-tf-examples/blob/main/examples/corp/container_app/README.md)
+
+This modular approach ensures clean separation of concerns while providing a seamless deployment experience.
+
 ## Conceptual Overview
+
+The module creates a **secure bridge** between GitHub Actions and Azure infrastructure by combining:
+
+1. **YAML Configuration** (what you specify) - Defines GitHub-specific settings like approvals, variables, and which repositories need environments
+2. **Terraform Remote State** (what comes from infrastructure) - Contains the technical details of deployment targets, roles, and permissions
+
+This combination enables powerful automation:
+
+- Infrastructure teams define standard role assignments and permissions once
+- Application teams use simple YAML to connect their repositories without duplicating complex settings
+- New applications can be onboarded to existing infrastructure in minutes
+
+---
 
 ### Where GitHub Environment Vending Fits in the Full Deployment Cycle
 
@@ -86,33 +153,40 @@ flowchart LR
     style B fill:#3c3,stroke:#333,stroke-width:2px
 ```
 
-The module creates a **secure bridge** between GitHub Actions and Azure infrastructure by combining:
-
-1. **YAML Configuration** (what you specify) - Defines GitHub-specific settings like approvals, variables, and which repositories need environments
-2. **Terraform Remote State** (what comes from infrastructure) - Contains the technical details of deployment targets, roles, and permissions
-
-This combination enables powerful automation:
-
-- Infrastructure teams define standard role assignments and permissions once
-- Application teams use simple YAML to connect their repositories without duplicating complex settings
-- New applications can be onboarded to existing infrastructure in minutes
-
----
-
 ## Table of Contents
 
 - [GitHub Environment Vending for Azure Infrastructure](#github-environment-vending-for-azure-infrastructure)
+  - [End-to-End Deployment Flow](#end-to-end-deployment-flow)
+    - [Three-Step Deployment Process](#three-step-deployment-process)
   - [Conceptual Overview](#conceptual-overview)
     - [Where GitHub Environment Vending Fits in the Full Deployment Cycle](#where-github-environment-vending-fits-in-the-full-deployment-cycle)
     - [Conceptual Design: The Power of YAML + Remote Terraform State](#conceptual-design-the-power-of-yaml--remote-terraform-state)
   - [Table of Contents](#table-of-contents)
   - [What This Module Does](#what-this-module-does)
     - [**Generic Infrastructure Support**](#generic-infrastructure-support)
-  - [Quick Setup Guide](#quick-setup-guide)
+  - [Quick Start Guide](#quick-start-guide)
     - [1. Copy Required Files](#1-copy-required-files)
+      - [Bash](#bash)
+      - [PowerShell](#powershell)
+      - [Bash](#bash-1)
+      - [PowerShell](#powershell-1)
+      - [Bash](#bash-2)
+      - [PowerShell](#powershell-2)
     - [2. Customize the Environment Configuration](#2-customize-the-environment-configuration)
     - [3. Commit, Push and Merge Changes](#3-commit-push-and-merge-changes)
+      - [Bash](#bash-3)
+      - [PowerShell](#powershell-3)
+      - [Bash](#bash-4)
+      - [PowerShell](#powershell-4)
+      - [Bash](#bash-5)
+      - [PowerShell](#powershell-5)
     - [4. Run the Workflow](#4-run-the-workflow)
+      - [Bash](#bash-6)
+      - [PowerShell](#powershell-6)
+      - [Bash](#bash-7)
+      - [PowerShell](#powershell-7)
+      - [Bash](#bash-8)
+      - [PowerShell](#powershell-8)
     - [5. Workflow Parameters Reference](#5-workflow-parameters-reference)
     - [6. Organizing Files in Your IaC Repository](#6-organizing-files-in-your-iac-repository)
     - [7. Verify the Results](#7-verify-the-results)
@@ -132,7 +206,7 @@ This combination enables powerful automation:
   - [Configuration Reference](#configuration-reference)
     - [YAML Structure](#yaml-structure)
     - [Environment Options](#environment-options)
-    - [Secrets Configuration](#secrets-configuration)
+    - [Secrets Configuration (TODO: Not implemented yet)](#secrets-configuration-todo-not-implemented-yet)
     - [Deployment Target Mapping](#deployment-target-mapping)
     - [Settings Override Behavior](#settings-override-behavior)
     - [Reviewers Configuration](#reviewers-configuration)
@@ -152,6 +226,8 @@ This combination enables powerful automation:
       - [**Remote state access error**](#remote-state-access-error)
       - [**Duplicate environments**](#duplicate-environments)
     - [Validation Outputs](#validation-outputs)
+      - [Bash](#bash-9)
+      - [PowerShell](#powershell-9)
     - [Best Practices for Validation](#best-practices-for-validation)
   - [Common Issues and Troubleshooting](#common-issues-and-troubleshooting)
   - [🌟 **Welcome Contributors!**](#-welcome-contributors)
@@ -184,7 +260,7 @@ While originally designed for Azure Container Apps, this module now supports **a
 
 The module creates the secure authentication foundation, while your infrastructure defines the specific deployment targets and permissions.
 
-## Quick Setup Guide
+## Quick Start Guide
 
 Setting up GitHub Environment vending in your IaC repository is a simple process:
 
@@ -198,6 +274,8 @@ You need just two files in your IaC repository:
 
    From your IaC repo root folder, run:
 
+   #### Bash
+
    ```bash
    # Create the workflows directory if it doesn't exist
    mkdir -p .github/workflows
@@ -206,22 +284,58 @@ You need just two files in your IaC repository:
    curl -o .github/workflows/github-environment-vending.yml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-github-environments/main/.github/workflows/github-environment-vending.yml
    ```
 
+   #### PowerShell
+
+   ```pwsh
+   # Create the workflows directory if it doesn't exist
+   New-Item -Path .github/workflows -ItemType Directory -Force
+
+   # Download the latest workflow file (overwrites existing if present)
+   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-github-environments/main/.github/workflows/github-environment-vending.yml" -OutFile ".github/workflows/github-environment-vending.yml"
+   ```
+
 2. Create an environment configuration file in your repository - use the minimal configuration
+
+   #### Bash
 
    ```bash
    # Create the deployments/github directory if it doesn't exist
    mkdir -p deployments/github
 
-   curl -o deployments/github/github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-github-environments/main/examples/minimal.yaml
+   # Download the minimal configuration
+   curl -o deployments/github/github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-github-environments/main/examples/github-environments-minimal.yaml
+   ```
+
+   #### PowerShell
+
+   ```pwsh
+   # Create the deployments/github directory if it doesn't exist
+   New-Item -Path deployments/github -ItemType Directory -Force
+
+   # Download the minimal configuration
+   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-github-environments/main/examples/github-environments-minimal.yaml" -OutFile "deployments/github/github-environments.yaml"
    ```
 
 3. Or use the complete configuration
 
+   #### Bash
+
    ```bash
    # Create the deployments/github directory if it doesn't exist
    mkdir -p deployments/github
 
-   curl -o deployments/github/github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-github-environments/main/examples/complete.yaml
+   # Download the complete configuration
+   curl -o deployments/github/github-environments.yaml https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-github-environments/main/examples/github-environments-full.yaml
+   ```
+
+   #### PowerShell
+
+   ```pwsh
+   # Create the deployments/github directory if it doesn't exist
+   New-Item -Path deployments/github -ItemType Directory -Force
+
+   # Download the complete configuration
+   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/HafslundEcoVannkraft/stratus-tf-github-environments/main/examples/github-environments-full.yaml" -OutFile "deployments/github/github-environments.yaml"
    ```
 
 > **Note**: You can place the `github-environments.yaml` file anywhere in your repository. The workflow will search for it recursively from the repo root. You only need to specify the filename, not the full path.
@@ -239,16 +353,24 @@ Example (minimal):
 
 ```yaml
 repositories:
-  - repo: your-app-repo-name
+  - repo: your-app-repo-name # Just the repo name, we only support HafslundEcoVannkraft org as for now
     environments:
-      - name: dev-ci
+      - name: apps-prod-cd
         wait_timer: 0
         prevent_self_review: false
         reviewers:
           users: []
           teams: []
         metadata:
-          deployment_target: dev # Maps to "dev" key in remote state environments
+          deployment_target: ace1 # Maps to "ace1" key in remote state environments
+      - name: apps-prod-cd
+        wait_timer: 0
+        prevent_self_review: true
+        reviewers:
+          users: [heintonny] # Replace with your github user or use team
+          teams: []
+        metadata:
+          deployment_target: ace1 # Maps to "ace1" key in remote state environments
 ```
 
 ### 3. Commit, Push and Merge Changes
@@ -257,20 +379,45 @@ Follow your team's standard workflow to get your changes into the main branch:
 
 1. Create a feature branch (if not already on one)
 
+   #### Bash
+
    ```bash
    git checkout -b feature/add-github-environments
    ```
 
+   #### PowerShell
+
+   ```pwsh
+   git checkout -b feature/add-github-environments
+   ```
+
 2. Commit your changes
+
+   #### Bash
 
    ```bash
    git add .github/workflows/github-environment-vending.yml deployments/github/github-environments.yaml
    git commit -m "Add GitHub environments configuration"
    ```
 
+   #### PowerShell
+
+   ```pwsh
+   git add .github/workflows/github-environment-vending.yml deployments/github/github-environments.yaml
+   git commit -m "Add GitHub environments configuration"
+   ```
+
 3. Push your changes and create a PR
 
+   #### Bash
+
    ```bash
+   git push -u origin feature/add-github-environments
+   ```
+
+   #### PowerShell
+
+   ```pwsh
    git push -u origin feature/add-github-environments
    ```
 
@@ -282,7 +429,19 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
 
 1. **Setup GitHub CLI Authentication** (one-time setup):
 
+   #### Bash
+
    ```bash
+   # Install and authenticate with GitHub CLI
+   gh auth login
+
+   # Verify authentication
+   gh auth status
+   ```
+
+   #### PowerShell
+
+   ```pwsh
    # Install and authenticate with GitHub CLI
    gh auth login
 
@@ -296,18 +455,39 @@ Once your changes are merged to the main branch, run the workflow using GitHub C
 
    **Standard Stratus IaC Repository Pattern** (recommended):
 
+   #### Bash
+
    ```bash
    gh workflow run github-environment-vending.yml \
      -f github_token=$(gh auth token) \
-     -f tfvars_file=<environment>.tfvars
+     -f tfvars_file=<environment>.tfvars   # Important! Replace <environments>.tfvars with you terraform variable file inside deployments/tfvars
+   ```
+
+   #### PowerShell
+
+   ```pwsh
+   gh workflow run github-environment-vending.yml `
+     -f github_token=$(gh auth token) `
+     -f tfvars_file=<environment>.tfvars   # Important! Replace <environments>.tfvars with you terraform variable file inside deployments/tfvars
    ```
 
    **Custom Setup with Remote State Overrides** (advanced):
+
+   #### Bash
 
    ```bash
    gh workflow run github-environment-vending.yml \
      -f github_token=$(gh auth token) \
      -f tfvars_file=<environment>.tfvars \
+     -f remote_state_config="rg=custom-state-rg,sa=customstateaccount,container=tfstate,key=custom-environment.tfstate"
+   ```
+
+   #### PowerShell
+
+   ```pwsh
+   gh workflow run github-environment-vending.yml `
+     -f github_token=$(gh auth token) `
+     -f tfvars_file=<environment>.tfvars `
      -f remote_state_config="rg=custom-state-rg,sa=customstateaccount,container=tfstate,key=custom-environment.tfstate"
    ```
 
@@ -563,9 +743,10 @@ repositories:
 | `variables`                                       | object  | Environment variables to create                      | {}      | No       |
 | `secrets`                                         | object  | Secrets to create from Azure Key Vault               | {}      | No       |
 
-### Secrets Configuration
+### Secrets Configuration (TODO: Not implemented yet)
 
 The `secrets` property allows you to reference secrets stored in Azure Key Vault:
+IMPORTANT! This feature is not implemented and supported yet and should not be required in most use cases. The apps can be configured with dapr secret-store who use a azure keyvault.
 
 ```yaml
 secrets:
@@ -826,7 +1007,22 @@ Error: Duplicate repository:environment combinations detected
 
 Check validation status using Terraform outputs:
 
+#### Bash
+
 ```bash
+# Check validation results
+terraform output validation_results
+
+# Example output:
+# {
+#   "deployment_targets_valid" = true
+#   "no_duplicate_environments" = true
+# }
+```
+
+#### PowerShell
+
+```pwsh
 # Check validation results
 terraform output validation_results
 
@@ -871,7 +1067,7 @@ For comprehensive troubleshooting, see our [Troubleshooting Guide](./TROUBLESHOO
 - ✨ **Add features** - Check our [good first issues](https://github.com/HafslundEcoVannkraft/stratus-tf-github-environments/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 - 🧪 **Test examples** - Try our configurations and share feedback
 
-**New to open source?** Perfect! Check our [Contributing Guide](./CONTRIBUTING.md) for a gentle introduction.
+**New to open source?** Perfect! Check our [Contributing Guide](./doc/CONTRIBUTING.md) for a gentle introduction.
 
 ---
 
@@ -897,4 +1093,4 @@ For comprehensive troubleshooting, see our [Troubleshooting Guide](./TROUBLESHOO
 
 ---
 
-**Ready to get started?** Follow the [Quick Setup Guide](#quick-setup-guide) or check out our [examples](./examples/) for common configuration patterns.
+**Ready to get started?** Follow the [Quick Start Guide](#quick-start-guide) or check out our [examples](./examples/) for common configuration patterns.

@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 # outputs.tf
-# Output values for the stratus-tf-aca-gh-vending module.
+# Output values for the stratus-tf-github-environments module.
 # Provides organized information about created resources and integration details.
 # -----------------------------------------------------------------------------
 

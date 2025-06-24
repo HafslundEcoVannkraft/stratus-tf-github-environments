@@ -11,7 +11,7 @@ repositories:
   - repo: your-app-repo  # Replace with your actual GitHub repository name
     environments:
       # Basic development environment with minimal restrictions
-      - name: dev
+      - name: apps-prod-ci
         wait_timer: 0               # No wait time for development
         prevent_self_review: false  # Allow self-approval for quick iteration
         reviewers:
@@ -19,10 +19,10 @@ repositories:
           teams: []
         # No deployment policy = any branch can deploy
         metadata:
-          deployment_target: dev  # Maps to "dev" key in remote state environments
-      
+          deployment_target: ace1  # Maps to "ace1" metadata key in remote terraform state github_environments output
+
       # Production environment with basic protections
-      - name: prod
+      - name: apps-prod-cd
         wait_timer: 10              # Brief wait to prevent accidental deployments
         prevent_self_review: true   # Require approval from someone else
         reviewers:
@@ -30,7 +30,7 @@ repositories:
             - username: "your-admin-username"  # Replace with actual GitHub username
           teams: []
         metadata:
-          deployment_target: prod  # Maps to "prod" key in remote state environments
+          deployment_target: ace1  # Maps to "ace1" key in remote state environments
 
 # Quick Setup Notes:
 # 1. Replace "your-app-repo" with your actual GitHub repository name

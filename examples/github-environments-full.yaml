@@ -12,7 +12,7 @@
 
 repositories:
   # Example 1: Web application with comprehensive environment setup
-  - repo: your-web-app-repo
+  - repo: your-web-app-repo # Just repo name, we dont support other orgs than HafslundEcoVannkraft as for now
     environments:
       # Development: Minimal restrictions for rapid iteration
       - name: dev-ci
@@ -27,7 +27,7 @@ repositories:
           LOG_LEVEL: "debug"
           FEATURE_FLAGS: "experimental"
         metadata:
-          deployment_target: dev # Maps to "dev" key in remote state environments metadata
+          deployment_target: ace1 # Maps to "ace1" key in remote state environments metadata
 
       - name: dev-cd
         wait_timer: 5 # Brief wait to prevent accidental deployments
@@ -42,7 +42,7 @@ repositories:
           custom_branch_policies: true
           branch_pattern: ["main", "develop", "feature/*"] # Allow feature branches
         metadata:
-          deployment_target: dev # Same Azure environment, different protections
+          deployment_target: ace1 # Same Azure environment, different protections
 
       # Staging: Enhanced protections with shared Azure environment
       - name: staging-ci
@@ -53,7 +53,7 @@ repositories:
           teams: []
         # CI operations typically don't need restrictions
         metadata:
-          deployment_target: staging # Maps to "staging" key in remote state environments metadata
+          deployment_target: ace2 # Maps to "ace2" key in remote state environments metadata
 
       - name: staging-cd
         wait_timer: 10 # Longer wait for staging deployments
@@ -70,7 +70,7 @@ repositories:
           ENVIRONMENT_TYPE: "staging"
           MONITORING_LEVEL: "standard"
         metadata:
-          deployment_target: staging
+          deployment_target: ace2
 
       # Production: Maximum security with tag-based deployments
       - name: prod-ci
@@ -82,7 +82,7 @@ repositories:
           teams:
             - name: "platform-team"
         metadata:
-          deployment_target: prod # Maps to "prod" key in remote state environments
+          deployment_target: ace3 # Maps to "ace3" key in remote state environments
 
       - name: prod-cd
         wait_timer: 30 # Extended wait time for production
@@ -103,7 +103,7 @@ repositories:
           MONITORING_LEVEL: "enhanced"
           SECURITY_SCANNING: "enabled"
         metadata:
-          deployment_target: prod
+          deployment_target: ace3
 
   # Example 2: Background processing service with different patterns
   - repo: your-background-jobs-repo
@@ -124,7 +124,7 @@ repositories:
           BATCH_SIZE: "100"
           DEBUG_JOBS: "true"
         metadata:
-          deployment_target: background-jobs # Different deployment target
+          deployment_target: ace4 # Different deployment target
 
       # Production: Strict controls for background processing
       - name: jobs-prod
@@ -142,7 +142,7 @@ repositories:
           BATCH_SIZE: "1000"
           MONITORING_ENABLED: "true"
         metadata:
-          deployment_target: background-jobs-prod
+          deployment_target: ace4
 
   # Example 3: API service with microservice patterns
   - repo: your-api-service-repo
@@ -155,7 +155,7 @@ repositories:
           users: []
           teams: []
         metadata:
-          deployment_target: api-services # Dedicated deployment target for APIs
+          deployment_target: ace5 # Dedicated deployment target for APIs
 
       - name: api-dev-cd
         wait_timer: 2
@@ -172,7 +172,7 @@ repositories:
           RATE_LIMITING: "development"
           CORS_ORIGINS: "*"
         metadata:
-          deployment_target: api-services
+          deployment_target: ace5
 
       # API Production with strict version control
       - name: api-prod-cd
@@ -195,7 +195,7 @@ repositories:
           CORS_ORIGINS: "https://app.example.com,https://admin.example.com"
           SECURITY_HEADERS: "enabled"
         metadata:
-          deployment_target: api-services-prod
+          deployment_target: ace6
 
   # Example 4: Custom role assignment conventions
   - repo: your-custom-workflow-repo
@@ -210,9 +210,9 @@ repositories:
         variables:
           VALIDATION_MODE: "strict"
         metadata:
-          deployment_target: custom-workflow # Gets role_assignments.validate
+          deployment_target: ace7 # Gets role_assignments.validate
 
-      # Custom deployment environment  
+      # Custom deployment environment
       - name: prod-deploy
         wait_timer: 15
         prevent_self_review: true
@@ -222,7 +222,7 @@ repositories:
         variables:
           DEPLOYMENT_MODE: "production"
         metadata:
-          deployment_target: custom-workflow # Gets role_assignments.deploy
+          deployment_target: ace7 # Gets role_assignments.deploy
 
   # Example 5: Generic GitHub environment (no deployment-specific configuration)
   - repo: your-docs-repo
@@ -247,7 +247,7 @@ repositories:
 # Configuration Notes:
 #
 # 1. Metadata Structure:
-#    - metadata.deployment_target maps to deployment targets in remote state
+#    - metadata.deployment_target maps to deployment targets in remote terraform state
 #    - Metadata is optional - environments without it are generic GitHub environments
 #    - You can add other metadata fields for different deployment types
 #
