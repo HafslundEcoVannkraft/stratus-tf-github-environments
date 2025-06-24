@@ -222,7 +222,7 @@ flowchart LR
       - [**3. GitHub API Validation**](#3-github-api-validation)
       - [**4. Azure Prerequisites Validation**](#4-azure-prerequisites-validation)
     - [Common Validation Errors](#common-validation-errors)
-      - [**Invalid deployment\_target**](#invalid-deployment_target)
+      - [**Invalid deployment_target**](#invalid-deployment_target)
       - [**Remote state access error**](#remote-state-access-error)
       - [**Duplicate environments**](#duplicate-environments)
     - [Validation Outputs](#validation-outputs)
@@ -362,7 +362,7 @@ repositories:
           users: []
           teams: []
         metadata:
-          deployment_target: ace1 # Maps to "ace1" key in remote state environments
+          deployment_target: cae1 # Maps to "cae1" key in remote state environments
       - name: apps-prod-cd
         wait_timer: 0
         prevent_self_review: true
@@ -370,7 +370,7 @@ repositories:
           users: [heintonny] # Replace with your github user or use team
           teams: []
         metadata:
-          deployment_target: ace1 # Maps to "ace1" key in remote state environments
+          deployment_target: cae1 # Maps to "cae1" key in remote state environments
 ```
 
 ### 3. Commit, Push and Merge Changes
