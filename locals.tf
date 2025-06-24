@@ -103,14 +103,16 @@ locals {
   environments = flatten([
     for repo in local.repositories : [
       for env in repo.environments : {
-        repository          = repo.repo
-        environment         = env.name
-        key                 = "${repo.repo}:${env.name}"
-        azure_resource_key  = "${repo.repo}-${env.name}"
-        metadata            = try(env.metadata, {})
-        prevent_destroy     = try(env.prevent_destroy, false)
-        wait_timer          = try(env.wait_timer, 0)
-        prevent_self_review = try(env.prevent_self_review, false)
+        repository             = repo.repo
+        repository_normalized  = replace(replace(repo.repo, ".", "-"), "_", "-") # Normalize repo naming for Azure naming compatibility
+        environment            = env.name
+        environment_normalized = replace(replace(env.name, ".", "-"), "_", "-") # Normalize environment naming for Azure naming compatibility
+        key                    = "${repo.repo}:${env.name}"
+        azure_resource_key     = "${repo.repo}-${env.name}"
+        metadata               = try(env.metadata, {})
+        prevent_destroy        = try(env.prevent_destroy, false)
+        wait_timer             = try(env.wait_timer, 0)
+        prevent_self_review    = try(env.prevent_self_review, false)
         reviewers = try(env.reviewers, {
           users = []
           teams = []

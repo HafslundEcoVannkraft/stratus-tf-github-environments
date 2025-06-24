@@ -41,7 +41,7 @@ module "github_environment_identity" {
 
   for_each = local.environments_map
 
-  name                = "${local.naming.managed_identity_prefix}-${each.value.repository}-${each.value.environment}"
+  name                = "${local.naming.managed_identity_prefix}-${each.value.repository_normalized}-${each.value.environment_normalized}"
   location            = var.location
   resource_group_name = azurerm_resource_group.github_identities.name
   enable_telemetry    = true
@@ -61,7 +61,7 @@ resource "azapi_resource" "github_environment_federated_credential" {
   for_each = local.environments_map
 
   type      = "Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31"
-  name      = "${each.value.repository}-${each.value.environment}"
+  name      = "${each.value.repository_normalized}-${each.value.environment_normalized}"
   parent_id = module.github_environment_identity[each.key].resource_id
   body = {
     properties = {
