@@ -1,6 +1,6 @@
 name: Simple Release
 
-# This workflow uses the simplified release action from stratus-gh-actions
+# This workflow uses the simplified release action from stratus-actions
 # The action handles version bumping based on PR labels and creates releases with GitHub's native notes
 
 on:
@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 0
 
       - name: Create Release
-        uses: HafslundEcoVannkraft/stratus-gh-actions/release@v3
+        uses: HafslundEcoVannkraft/stratus-actions/release@v1
         with:
           draft: false
           prerelease: false
